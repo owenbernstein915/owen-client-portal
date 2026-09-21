@@ -236,6 +236,11 @@ function field(f, path, root = false) {
   if (f.type === 'object' || f.type === 'file') return el('div', { class: 'field-grid' }, ...f.fields.filter(child => !child.readonly).map(child => field(child, [...path, child.name])));
   if (f.type === 'boolean') return el('label', { class: 'toggle-field' }, el('span', {}, label), el('input', { type: 'checkbox', role: 'switch', checked: value === true, onChange: e => set(path, e.target.checked) }));
   if (f.type === 'image') return imageField(f, path, value);
+  if (f.type === 'select') {
+    const values = f.options?.values || [];
+    const input = el('select', { required: f.required, onChange: e => set(path, e.target.value) }, ...values.map(option => el('option', { value: option.name, selected: value === option.name }, option.label || option.name)));
+    return el('label', { class: 'field' }, el('span', {}, label, f.required && el('span', { class: 'required' }, ' *')), input, f.description && el('small', { class: 'muted' }, f.description));
+  }
   const multiline = f.type === 'text';
   const input = el(multiline ? 'textarea' : 'input', { ...(multiline ? { rows: 4 } : { type: f.name === 'email' ? 'email' : 'text' }), required: f.required, readonly: f.readonly, maxlength: multiline ? '15000' : '3000', onInput: e => set(path, e.target.value) });
   input.value = value || '';
@@ -247,7 +252,8 @@ function imageField(f, path, value) {
   if (value) {
     const sha = S.data.hasDraft ? S.data.draftSha : S.data.mainSha;
     const key = `${S.client.id}:${sha}:${value}`;
-    if (S.previews.has(value)) { image.src = S.previews.get(value); caption.textContent = 'New photo · save draft to keep it'; }
+    if (/^https:\/\/images\.getbento\.com\//.test(value)) { image.src = value; caption.textContent = 'Current photo'; }
+    else if (S.previews.has(value)) { image.src = S.previews.get(value); caption.textContent = 'New photo · save draft to keep it'; }
     else {
       if (!S.loadedImages.has(key)) S.loadedImages.set(key, api('image', { query: { path: value, sha }, blob: true }).then(blob => { const url = URL.createObjectURL(blob); S.loadedImages.set(key, url); return url; }).catch(() => { S.loadedImages.delete(key); return null; }));
       Promise.resolve(S.loadedImages.get(key)).then(url => { if (url) { image.src = url; caption.textContent = 'Current photo'; } else caption.textContent = 'Photo preview unavailable'; });

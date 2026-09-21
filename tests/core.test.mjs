@@ -50,6 +50,7 @@ test('client authorization is server-owned and denies unknown users and websites
   assert.throws(() => accessFor('unknown', env), /not been assigned/);
   assert.throws(() => clientFor('libelula', accessFor('outsider', env)), /do not have access/);
   assert.equal(clientFor('libelula', accessFor('admin', env)).id, 'libelula');
+  assert.equal(clientFor('little-daisy', accessFor('admin', env)).id, 'little-daisy');
 });
 test('image uploads reject traversal and disguised non-image files', () => {
   assert.throws(() => validateUpload({ path: 'public/images/uploads/../../app.js', base64: 'YWJj' }, clients[0]), /filename/);

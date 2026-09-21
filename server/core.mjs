@@ -51,7 +51,11 @@ export function validateContent(content, client) {
     } else {
       if (typeof value !== 'string' || value.length > (field.type === 'text' ? 15000 : 3000)) fail(400, `${label} must be valid text.`);
       if (field.required && !value.trim()) fail(400, `${label} is required.`);
-      if (field.type === 'image' && value && (!/^\/images\/[a-zA-Z0-9_./-]+$/.test(value) || value.includes('..'))) fail(400, `${label} must use a website image.`);
+      if (field.type === 'image' && value) {
+        const localImage = /^\/images\/[a-zA-Z0-9_./-]+$/.test(value) && !value.includes('..');
+        const existingBentoImage = /^https:\/\/images\.getbento\.com\/[a-zA-Z0-9_./?=&,%+-]+$/.test(value);
+        if (!localImage && !existingBentoImage) fail(400, `${label} must use a website image.`);
+      }
       if ((/url$/i.test(field.name) || ['reservations', 'orderOnline', 'instagram', 'facebook'].includes(field.name)) && value) {
         if (!/^(https?:\/\/|mailto:|tel:|\/(?!\/)|#)/i.test(value) || /[\x00-\x20\\]/.test(value)) fail(400, `${label} needs a valid website, phone, email, or page link.`);
       }
