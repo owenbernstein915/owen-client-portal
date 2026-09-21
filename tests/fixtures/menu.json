@@ -1,0 +1,789 @@
+[
+  {
+    "id": "brunch",
+    "label": "Breakfast + Lunch",
+    "kicker": "Served Tuesday through Sunday",
+    "note": "Breakfast + lunch",
+    "sections": [
+      {
+        "title": "Breakfast",
+        "items": [
+          {
+            "name": "Mangú Tres Golpes",
+            "detail": "Mashed green plantain, eggs, fried cheese, salami, pickled onions",
+            "price": "$20",
+            "available": true
+          },
+          {
+            "name": "Eggs Benedict",
+            "detail": "Poached eggs, salami, English muffins, huancaína sauce, salsa criolla, choice of side",
+            "price": "$20",
+            "available": true
+          },
+          {
+            "name": "Vegetable Omelette",
+            "detail": "Spinach eggs, onion, peppers, sweet potato purée, fried sweet potato, choice of side",
+            "price": "$19",
+            "available": true
+          },
+          {
+            "name": "Steak + Eggs",
+            "detail": "Anticucho flank steak, crispy breakfast potatoes, pickled onion salad, roasted tomato, two eggs",
+            "price": "$24",
+            "available": true
+          },
+          {
+            "name": "Mushroom Enchiladas",
+            "detail": "Black bean and mushroom filled tortillas, salsa verde, lime cream, plantain chips, pickled onions, two eggs",
+            "price": "$19",
+            "available": true
+          },
+          {
+            "name": "Tres Leches Pancake",
+            "detail": "Buttermilk pancakes, dulce de leche, fresh berries, tres leches syrup",
+            "price": "$19",
+            "available": true
+          },
+          {
+            "name": "Short Rib Huevos Rancheros",
+            "detail": "Ropa vieja style short ribs, ranchero eggs, olives, potato, arugula, pickled onions",
+            "price": "$26",
+            "available": true
+          },
+          {
+            "name": "Chilaquiles",
+            "detail": "Corn tortilla chips, two fried eggs, chicharrón, queso fresco, pico de gallo, lime crema",
+            "price": "$20",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Soup",
+        "items": [
+          {
+            "name": "Dominican Sancocho",
+            "detail": "Beef, chicken, pork, yucca, plantains, auyama, potatoes, corn, white rice",
+            "price": "$22",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Lunch",
+        "items": [
+          {
+            "name": "Ceviche",
+            "detail": "White market fish, leche de tigre, choclo, cancha, sweet potato, tostones",
+            "price": "$22",
+            "available": true
+          },
+          {
+            "name": "Roasted Corn + Burrata",
+            "detail": "Fire roasted corn, burrata, cherry tomatoes, cancha, balsamic glaze, garlic aioli",
+            "price": "$20",
+            "available": true
+          },
+          {
+            "name": "Camarón al Ajillo",
+            "detail": "Shrimp sautéed in creamy chili garlic butter with scallions and onions. Add rice $5",
+            "price": "$20",
+            "available": true
+          },
+          {
+            "name": "Pollo a la Brasa",
+            "detail": "Roasted half chicken, ají verde, salsa criolla, choice of side",
+            "price": "$24",
+            "available": true
+          },
+          {
+            "name": "Ahi Tuna",
+            "detail": "Fresh tuna, Meyer lemon aioli, salsa criolla, honey braised maduros, corn tortilla strips",
+            "price": "$21",
+            "available": true
+          },
+          {
+            "name": "Lomo Saltado",
+            "detail": "Beef stir fry, onions, tomatoes, potato wedges, creamy basil noodles",
+            "price": "$26",
+            "available": true
+          },
+          {
+            "name": "La Bandera",
+            "detail": "Slow roasted pork, white rice, red beans, sweet plantains",
+            "price": "$25",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Sandwiches",
+        "items": [
+          {
+            "name": "Breakfast Sandwich",
+            "detail": "Egg, salami, fried cheese, ají verde on a croissant, choice of side",
+            "price": "$19",
+            "available": true
+          },
+          {
+            "name": "Pan con Chicharrón",
+            "detail": "Chicharrón on a roll, fried sweet potato, criolla, ají verde salsa",
+            "price": "$20",
+            "available": true
+          },
+          {
+            "name": "Cuban Sandwich",
+            "detail": "Pulled pork, pork belly, ham, Swiss cheese, mustard, pickles, choice of side",
+            "price": "$19",
+            "available": true
+          },
+          {
+            "name": "Steak Sandwich",
+            "detail": "Sliced ribeye, roasted garlic aioli, roasted red peppers, salt and vinegar chips on a roll",
+            "price": "$21",
+            "available": true
+          },
+          {
+            "name": "Chimichurri Burger",
+            "detail": "Dominican smashed burger, cabbage, tomato, house chimi sauce, choice of side",
+            "price": "$20",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Empanadas",
+        "items": [
+          {
+            "name": "Cheese",
+            "detail": "",
+            "price": "$4",
+            "available": true
+          },
+          {
+            "name": "Egg, Cheese + Tots",
+            "detail": "",
+            "price": "$5",
+            "available": true
+          },
+          {
+            "name": "Chicken + Potato",
+            "detail": "",
+            "price": "$5",
+            "available": true
+          },
+          {
+            "name": "Carne + Maduro",
+            "detail": "",
+            "price": "$5",
+            "available": true
+          },
+          {
+            "name": "Mushroom, Black Bean + Cheese",
+            "detail": "",
+            "price": "$5",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Sides",
+        "items": [
+          {
+            "name": "Avocado",
+            "detail": "",
+            "price": "$4",
+            "available": true
+          },
+          {
+            "name": "White Rice",
+            "detail": "",
+            "price": "$5",
+            "available": true
+          },
+          {
+            "name": "Breakfast Potatoes",
+            "detail": "",
+            "price": "$5",
+            "available": true
+          },
+          {
+            "name": "Yucca Fries",
+            "detail": "",
+            "price": "$6",
+            "available": true
+          },
+          {
+            "name": "French Fries",
+            "detail": "",
+            "price": "$6",
+            "available": true
+          },
+          {
+            "name": "Maduros",
+            "detail": "",
+            "price": "$6",
+            "available": true
+          },
+          {
+            "name": "Tostones",
+            "detail": "",
+            "price": "$7",
+            "available": true
+          },
+          {
+            "name": "Sautéed Corn",
+            "detail": "",
+            "price": "$7",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Kids Corner",
+        "items": [
+          {
+            "name": "Avena",
+            "detail": "Chocolate oatmeal, apple compote, pressed bread",
+            "price": "$8",
+            "available": true
+          },
+          {
+            "name": "Scrambled Eggs",
+            "detail": "Two scrambled eggs, choice of side",
+            "price": "$12",
+            "available": true
+          },
+          {
+            "name": "Mini Breakfast Sandwich",
+            "detail": "Egg, salami, cheese, English muffin, choice of side",
+            "price": "$13",
+            "available": true
+          },
+          {
+            "name": "Chicharrón de Pollo",
+            "detail": "Popcorn chicken, choice of side",
+            "price": "$15",
+            "available": true
+          },
+          {
+            "name": "Short Stack",
+            "detail": "Three pancakes, berries",
+            "price": "$12",
+            "available": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bakery",
+    "label": "Bakery + Cakes",
+    "kicker": "Baked in small batches",
+    "note": "Bakery + cakes",
+    "sections": [
+      {
+        "title": "Morning Pastries",
+        "items": [
+          {
+            "name": "Medialuna",
+            "detail": "Glazed croissant",
+            "price": "$3.75",
+            "available": true
+          },
+          {
+            "name": "Pain au Chocolat",
+            "detail": "Chocolate croissant",
+            "price": "$4.25",
+            "available": true
+          },
+          {
+            "name": "Purple Corn Blueberry Muffin",
+            "detail": "A Libélula bakery favorite",
+            "price": "$4.25",
+            "available": true
+          },
+          {
+            "name": "Pastelitos",
+            "detail": "Danish pastry",
+            "price": "$5.25",
+            "available": true
+          },
+          {
+            "name": "Scone",
+            "detail": "Ask about today's flavor",
+            "price": "$4",
+            "available": true
+          },
+          {
+            "name": "Almond Croissant",
+            "detail": "Buttery croissant with almond filling",
+            "price": "$5.25",
+            "available": true
+          },
+          {
+            "name": "Pan Dulce",
+            "detail": "Traditional concha",
+            "price": "$3.75",
+            "available": true
+          },
+          {
+            "name": "Banana Loaf",
+            "detail": "A tender slice for coffee",
+            "price": "$4",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Cookies + Small Sweets",
+        "items": [
+          {
+            "name": "Chocolate Chip Cookie",
+            "detail": "Classic or spicy double chocolate",
+            "price": "$4.25",
+            "available": true
+          },
+          {
+            "name": "S'more Cookie",
+            "detail": "Chocolate, marshmallow, and graham",
+            "price": "$4.25",
+            "available": true
+          },
+          {
+            "name": "Alfajores",
+            "detail": "Shortbread cookies filled with dulce de leche",
+            "price": "$3.25",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Weekend Desserts",
+        "items": [
+          {
+            "name": "Tres Leches",
+            "detail": "Sponge cake soaked in three milks, cinnamon, whipped cream",
+            "price": "$10",
+            "available": true
+          },
+          {
+            "name": "Alfajor",
+            "detail": "Shortbread cookie, dulce de leche",
+            "price": "$3",
+            "available": true
+          },
+          {
+            "name": "Picarones",
+            "detail": "Peruvian squash and sweet potato fritters",
+            "price": "$10",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Custom Cakes",
+        "items": [
+          {
+            "name": "Celebration Cakes",
+            "detail": "Made-to-order designs for birthdays, showers, anniversaries, and milestones",
+            "price": "Inquiry",
+            "available": true
+          },
+          {
+            "name": "Wedding Cakes",
+            "detail": "Tiered statement cakes, tastings, design consultation, and custom sugar flowers",
+            "price": "Inquiry",
+            "available": true
+          },
+          {
+            "name": "Cookies + Dessert Tables",
+            "detail": "Custom iced cookies, cupcakes, macarons, and coordinated sweets",
+            "price": "Inquiry",
+            "available": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dinner",
+    "label": "Dinner",
+    "kicker": "Friday and Saturday evenings",
+    "note": "Dinner menu",
+    "sections": [
+      {
+        "title": "Starters",
+        "items": [
+          {
+            "name": "Ceviche",
+            "detail": "White fish, leche de tigre, sweet potato, Peruvian corn, cancha",
+            "price": "$21",
+            "available": true
+          },
+          {
+            "name": "Tuna Tartare",
+            "detail": "Ají verde, truffle oil snow, tostones",
+            "price": "$18",
+            "available": true
+          },
+          {
+            "name": "Camarón al Ajillo",
+            "detail": "Shrimp, chili garlic butter, scallion, onion",
+            "price": "$19",
+            "available": true
+          },
+          {
+            "name": "Beet + Tomato Salad",
+            "detail": "Arugula, cilantro, soft creamy cheese, pecans, balsamic glaze",
+            "price": "$19",
+            "available": true
+          },
+          {
+            "name": "Squash Soup",
+            "detail": "Roasted butternut squash, sage marshmallows",
+            "price": "$16",
+            "available": true
+          },
+          {
+            "name": "Papa Rellena de Pollo",
+            "detail": "Potato, chicken, soft boiled egg",
+            "price": "$18",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Main Course",
+        "items": [
+          {
+            "name": "Lomo Saltado",
+            "detail": "Beef stir fry, onion, tomato, basil pesto spaghetti",
+            "price": "$28",
+            "available": true
+          },
+          {
+            "name": "Pollo a la Brasa",
+            "detail": "Roasted chicken, ají verde, salsa criolla, choice of side",
+            "price": "$25",
+            "available": true
+          },
+          {
+            "name": "La Bandera",
+            "detail": "Roasted pork, pork belly, rice, red beans, maduros, soy egg",
+            "price": "$26",
+            "available": true
+          },
+          {
+            "name": "Short Rib Ropa Vieja",
+            "detail": "Parsnip purée, green olives, sweet peppers, plantain chip, pickled onions",
+            "price": "$32",
+            "available": true
+          },
+          {
+            "name": "Vegetable Pastelón",
+            "detail": "Quinoa bolognese, maduros, basil pesto, arugula salad",
+            "price": "$20",
+            "available": true
+          },
+          {
+            "name": "Strip Steak + Tallarín",
+            "detail": "Strip steak, king oyster mushroom, pecorino, chili threads, balsamic, rocoto aioli, basil pesto noodles",
+            "price": "$30",
+            "available": true
+          },
+          {
+            "name": "Pork Chop",
+            "detail": "Spiced apple chutney, sweet potato purée, crispy chili lime Brussels sprouts",
+            "price": "$27",
+            "available": true
+          },
+          {
+            "name": "Tuna Vegetable Chaufa",
+            "detail": "Seared five spice tuna, vegetable fried rice",
+            "price": "$24",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Sides",
+        "items": [
+          {
+            "name": "Maduros",
+            "detail": "Lime crema, cilantro",
+            "price": "$9",
+            "available": true
+          },
+          {
+            "name": "Rice",
+            "detail": "Choclo, cilantro",
+            "price": "$8",
+            "available": true
+          },
+          {
+            "name": "Tostones",
+            "detail": "Garlic mojo",
+            "price": "$9",
+            "available": true
+          },
+          {
+            "name": "Brussels Sprouts",
+            "detail": "Chili lime glazed",
+            "price": "$10",
+            "available": true
+          },
+          {
+            "name": "Papa a la Huancaína",
+            "detail": "Ají amarillo, salsa criolla, cancha",
+            "price": "$9",
+            "available": true
+          },
+          {
+            "name": "Beet + Tomato Salad",
+            "detail": "Cheese, pecans, balsamic",
+            "price": "$10",
+            "available": true
+          },
+          {
+            "name": "Vegetable Chaufa",
+            "detail": "Fried rice",
+            "price": "$9",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Dessert",
+        "items": [
+          {
+            "name": "Tres Leches",
+            "detail": "Sponge cake soaked in three milks, cinnamon, whipped cream",
+            "price": "$10",
+            "available": true
+          },
+          {
+            "name": "Alfajor",
+            "detail": "Shortbread cookie, dulce de leche",
+            "price": "$3",
+            "available": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "drinks",
+    "label": "Drinks",
+    "kicker": "Coffee, tea, juice, and soft drinks",
+    "note": "Beverages",
+    "sections": [
+      {
+        "title": "Hot Beverages",
+        "items": [
+          {
+            "name": "Drip Coffee",
+            "detail": "",
+            "price": "",
+            "available": true
+          },
+          {
+            "name": "Latte",
+            "detail": "",
+            "price": "",
+            "available": true
+          },
+          {
+            "name": "Cappuccino",
+            "detail": "",
+            "price": "",
+            "available": true
+          },
+          {
+            "name": "Americano",
+            "detail": "",
+            "price": "",
+            "available": true
+          },
+          {
+            "name": "Espresso",
+            "detail": "",
+            "price": "",
+            "available": true
+          },
+          {
+            "name": "Mocha",
+            "detail": "",
+            "price": "",
+            "available": true
+          },
+          {
+            "name": "Hot Chocolate",
+            "detail": "",
+            "price": "",
+            "available": true
+          },
+          {
+            "name": "Cold Brew",
+            "detail": "",
+            "price": "",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Tea",
+        "items": [
+          {
+            "name": "English Breakfast",
+            "detail": "",
+            "price": "$2.75 / $3.25",
+            "available": true
+          },
+          {
+            "name": "Earl Grey",
+            "detail": "",
+            "price": "$2.75 / $3.25",
+            "available": true
+          },
+          {
+            "name": "Jasmine White",
+            "detail": "",
+            "price": "$2.75 / $3.25",
+            "available": true
+          },
+          {
+            "name": "Sencha Green",
+            "detail": "",
+            "price": "$2.75 / $3.25",
+            "available": true
+          },
+          {
+            "name": "Chamomile",
+            "detail": "",
+            "price": "$2.75 / $3.25",
+            "available": true
+          },
+          {
+            "name": "Ginger Lemongrass",
+            "detail": "",
+            "price": "$2.75 / $3.25",
+            "available": true
+          },
+          {
+            "name": "Peppermint",
+            "detail": "",
+            "price": "$2.75 / $3.25",
+            "available": true
+          },
+          {
+            "name": "Hibiscus Iced Tea",
+            "detail": "",
+            "price": "$2.75 / $3.25",
+            "available": true
+          },
+          {
+            "name": "Black Iced Tea",
+            "detail": "",
+            "price": "$2.75 / $3.25",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Soft Drinks",
+        "items": [
+          {
+            "name": "Coca-Cola",
+            "detail": "",
+            "price": "$3",
+            "available": true
+          },
+          {
+            "name": "Diet Coke",
+            "detail": "",
+            "price": "$3",
+            "available": true
+          },
+          {
+            "name": "Sprite",
+            "detail": "",
+            "price": "$3",
+            "available": true
+          },
+          {
+            "name": "Ginger Ale",
+            "detail": "",
+            "price": "$3",
+            "available": true
+          },
+          {
+            "name": "Inka Cola",
+            "detail": "",
+            "price": "$4",
+            "available": true
+          },
+          {
+            "name": "Country Club",
+            "detail": "Raspberry or orange",
+            "price": "$4",
+            "available": true
+          },
+          {
+            "name": "Malta Goya",
+            "detail": "",
+            "price": "$4",
+            "available": true
+          }
+        ]
+      },
+      {
+        "title": "Juice + Specials",
+        "items": [
+          {
+            "name": "Orange Juice",
+            "detail": "",
+            "price": "$4",
+            "available": true
+          },
+          {
+            "name": "Apple Juice",
+            "detail": "",
+            "price": "$4",
+            "available": true
+          },
+          {
+            "name": "Passionfruit Juice",
+            "detail": "",
+            "price": "$4",
+            "available": true
+          },
+          {
+            "name": "Mango Juice",
+            "detail": "",
+            "price": "$4",
+            "available": true
+          },
+          {
+            "name": "Pineapple Juice",
+            "detail": "",
+            "price": "$4",
+            "available": true
+          },
+          {
+            "name": "Chicha Morada",
+            "detail": "",
+            "price": "$4.75",
+            "available": true
+          },
+          {
+            "name": "Morir Soñando",
+            "detail": "",
+            "price": "$4.75",
+            "available": true
+          }
+        ]
+      }
+    ]
+  }
+]

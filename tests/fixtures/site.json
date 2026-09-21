@@ -1,0 +1,141 @@
+{
+  "announcement": {
+    "enabled": false,
+    "text": "Dinner is served Friday and Saturday"
+  },
+  "brand": {
+    "name": "LIBÉLULA",
+    "subtitle": "Bakery + Kitchen",
+    "location": "Montclair, NJ"
+  },
+  "hero": {
+    "eyebrow": "Bakery + Kitchen · Montclair, NJ",
+    "title": "LIBÉLULA",
+    "description": "A bakery and kitchen shaped by Peru and the Dominican Republic.",
+    "image": "/images/hero-food.jpg",
+    "imageAlt": "A colorful spread of Peruvian and Dominican dishes from Libélula",
+    "buttonText": "Explore the menus",
+    "buttonUrl": "/menu"
+  },
+  "bakery": {
+    "eyebrow": "Bakery + cakes",
+    "heading": "Come for the croissants. Celebrate with cake.",
+    "description": "The pastry counter brings together medialunas, pain au chocolat, alfajores, conchas, cookies, and small-batch seasonal bakes. Custom cakes and dessert tables are designed for weddings, birthdays, showers, and everything worth gathering for.",
+    "image": "/images/custom-cake.jpg",
+    "imageAlt": "A two-tier floral custom cake by pastry chef Veruska Samanez",
+    "primaryButtonText": "Bakery + cakes menu",
+    "primaryButtonUrl": "/menu#bakery-cakes",
+    "secondaryButtonText": "Ask about a custom cake",
+    "secondaryButtonUrl": "#contact"
+  },
+  "story": {
+    "eyebrow": "Meet the chefs + owners",
+    "heading": "Built from two culinary careers and one shared kitchen.",
+    "description": "Brian and Veruska met at the Culinary Institute of America. After years in restaurants and small businesses across New York and New Jersey, they opened Libélula in the Montclair community where they are raising their family.",
+    "image": "/images/chefs.webp",
+    "imageAlt": "Chefs and owners Veruska Samanez and Brian Martinez inside Libélula",
+    "imageCaption": "Chefs Veruska Samanez + Brian Martinez",
+    "owners": [
+      {
+        "name": "Veruska",
+        "bio": "A CIA graduate in Baking and Pastry Arts and Business Management, Veruska founded Cake + Flourish and competed on Food Network's Spring Baking Championship in 2021.",
+        "linkText": "Cake + Flourish",
+        "linkUrl": "https://www.cakeandflourish.com/"
+      },
+      {
+        "name": "Brian",
+        "bio": "A CIA Culinary Arts graduate, Brian built his career in leading New York and New Jersey restaurants, including roles with Fleming's and Harvest Restaurant Group."
+      }
+    ]
+  },
+  "reviews": {
+    "eyebrow": "Local favorite",
+    "rating": "4.8",
+    "ratingText": "Google rating from 299 diners",
+    "reviewsUrl": "https://www.google.com/search?q=Lib%C3%A9lula+Bakery+and+Kitchen+Montclair+reviews",
+    "items": [
+      {
+        "quote": "Probably the best ceviche I’ve ever had.",
+        "source": "Recent Google review",
+        "visible": true
+      },
+      {
+        "quote": "Everything was delicious, perfectly cooked, and presented with a twist.",
+        "source": "Google review",
+        "visible": true
+      },
+      {
+        "quote": "The service was absolutely fantastic.",
+        "source": "Recent guest review",
+        "visible": true
+      }
+    ]
+  },
+  "social": {
+    "eyebrow": "From the kitchen",
+    "heading": "Plates, pastries, and the dining room.",
+    "buttonText": "@libelulamontclair",
+    "images": [
+      {
+        "image": "/images/interior.jpg",
+        "alt": "The bright plant-filled dining room at Libélula",
+        "visible": true
+      },
+      {
+        "image": "/images/food-detail-2.jpg",
+        "alt": "Freshly prepared food from Libélula",
+        "visible": true
+      },
+      {
+        "image": "/images/instagram-sancocho.jpg",
+        "alt": "Dominican sancocho from Libélula's Instagram",
+        "visible": true
+      }
+    ]
+  },
+  "reservation": {
+    "eyebrow": "Reservations",
+    "heading": "Reserve at Libélula.",
+    "description": "Choose a date and we’ll show only times that fit that day’s hours. Toast confirms the latest table availability.",
+    "liveLinkText": "Open Toast live availability"
+  },
+  "visit": {
+    "eyebrow": "Visit Libélula",
+    "addressLine1": "5 North Fullerton Avenue",
+    "addressLine2": "Montclair, New Jersey",
+    "phoneDisplay": "(973) 707-2082",
+    "phoneUrl": "tel:+19737072082",
+    "mapUrl": "https://www.google.com/maps/dir/?api=1&destination=5+N+Fullerton+Ave+Montclair+NJ+07042",
+    "hours": [
+      {
+        "day": "Monday",
+        "time": "Closed"
+      },
+      {
+        "day": "Tuesday to Thursday",
+        "time": "8 AM to 4 PM"
+      },
+      {
+        "day": "Friday + Saturday",
+        "time": "8 AM to 9 PM"
+      },
+      {
+        "day": "Sunday",
+        "time": "8 AM to 4 PM"
+      }
+    ],
+    "hoursNote": "Reservations are recommended for weekend brunch and dinner."
+  },
+  "contact": {
+    "eyebrow": "Plan something delicious",
+    "heading": "Custom cakes, catering, private events, and questions.",
+    "description": "Tell us what you’re planning.",
+    "email": "info@libelulamontclair.com"
+  },
+  "links": {
+    "reservations": "https://tables.toasttab.com/restaurants/132a58a4-cbdc-4769-be08-82d08cc67522/findTime",
+    "orderOnline": "https://www.toasttab.com/local/order/libelulamontclair",
+    "instagram": "https://www.instagram.com/libelulamontclair/",
+    "facebook": "https://www.facebook.com/LibelulaBakeryAndKitchen"
+  }
+}
