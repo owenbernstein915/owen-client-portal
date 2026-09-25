@@ -52,30 +52,58 @@ async function api(action, options = {}) {
   return options.blob ? res.blob() : res.json();
 }
 function branding() { return el('div', { class: 'brand' }, el('div', { class: 'brand-mark' }, el('img', { src: '/ob-logo-mark.png', alt: 'Owen B monogram' })), el('div', {}, el('strong', {}, 'Owen B'), el('small', {}, 'WEB DESIGN'))); }
-function login(recover = false) {
+async function requestSignup(email) {
+  const response = await fetch('/api/portal?action=signup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
+  if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'Account setup is temporarily unavailable.'); }
+}
+function login(mode = 'signin', submittedEmail = '') {
   app.replaceChildren();
-  const email = el('input', { type: 'email', autocomplete: 'email', placeholder: 'you@yourbusiness.com', required: true });
+  const recover = mode === 'password'; const signup = mode === 'signup'; const sent = mode === 'sent';
+  const email = el('input', { type: 'email', autocomplete: 'email', placeholder: 'you@yourbusiness.com', required: true, value: submittedEmail });
   const password = el('input', { type: 'password', autocomplete: recover ? 'new-password' : 'current-password', minlength: recover ? '12' : '1', required: true });
+  const confirmPassword = el('input', { type: 'password', autocomplete: 'new-password', minlength: '12', required: true });
   const error = el('p', { class: 'form-error', role: 'alert' });
-  const submit = el('button', { class: 'button primary wide', type: 'submit' }, recover ? 'Set password' : 'Sign in');
+  const submit = el('button', { class: 'button primary wide', type: 'submit' }, recover ? 'Set password' : signup ? 'Send my setup link' : 'Sign in');
   const form = el('form', { onSubmit: async event => {
     event.preventDefault(); submit.disabled = true; error.textContent = '';
     try {
-      if (recover) { await auth('user', { password: password.value }, 'PUT', await accessToken()); S.recovery = false; }
-      else setSession(await auth('token?grant_type=password', { email: email.value.trim(), password: password.value }));
+      if (signup) { await requestSignup(email.value.trim()); login('sent', email.value.trim()); return; }
+      if (recover) {
+        if (password.value !== confirmPassword.value) { error.textContent = 'The passwords do not match.'; return; }
+        const token = await accessToken();
+        const user = await auth('user', null, 'GET', token);
+        await auth('user', { password: password.value }, 'PUT', token);
+        try { setSession(await auth('token?grant_type=password', { email: user.email, password: password.value })); }
+        catch { setSession(null); S.recovery = false; login(); toast('Password saved. Please sign in with your new password.'); return; }
+        S.recovery = false;
+      } else setSession(await auth('token?grant_type=password', { email: email.value.trim(), password: password.value }));
       await openWorkspace();
     } catch (e) { error.textContent = e.message; }
     finally { submit.disabled = false; }
   } },
   !recover && el('label', { class: 'field' }, 'Email address', email),
-  el('label', { class: 'field' }, recover ? 'New password (at least 12 characters)' : 'Password', password), error, submit);
+  !signup && el('label', { class: 'field' }, recover ? 'New password (at least 12 characters)' : 'Password', password),
+  recover && el('label', { class: 'field' }, 'Confirm new password', confirmPassword), error, submit);
   const forgot = button('Forgot your password?', async () => {
     if (!email.reportValidity()) return;
     try { await auth(`recover?redirect_to=${encodeURIComponent(location.origin + '/')}`, { email: email.value.trim() }); toast('If your account exists, a password reset email is on its way.'); }
     catch (e) { toast(e.message, true); }
   }, 'text-button');
+  const registration = button('Create your account', () => login('signup'), 'text-button');
+  const signIn = button('Back to sign in', () => login(), 'text-button');
+  const resend = button('Send another link', async () => {
+    resend.disabled = true;
+    try { await requestSignup(submittedEmail); toast('If this address is approved, another setup link is on its way.'); }
+    catch (e) { toast(e.message, true); }
+    finally { resend.disabled = false; }
+  }, 'text-button');
   app.append(el('main', { class: 'login' }, el('section', { class: 'login-intro' }, branding(), el('div', {}, el('p', { class: 'eyebrow' }, 'OWEN B WEB DESIGN'), el('h1', {}, el('span', { class: 'outline-text' }, 'Your website.'), el('span', {}, 'In your hands.')), el('p', {}, 'Update your content. Share something new. Make it yours.')), el('p', { class: 'login-footer' }, 'Client portal · Owen B Web Design')),
-    el('section', { class: 'login-panel' }, el('div', { class: 'login-form' }, el('p', { class: 'eyebrow' }, 'WELCOME BACK'), el('h2', {}, recover ? 'Choose your password' : 'Your website starts here.'), el('p', { class: 'muted' }, recover ? 'Use a password you do not use elsewhere.' : 'Sign in with the account Owen created for you.'), form, !recover && forgot, el('p', { class: 'help' }, 'Need access? Contact Owen to get your account set up.')))));
+    el('section', { class: 'login-panel' }, el('div', { class: 'login-form' }, el('p', { class: 'eyebrow' }, sent ? 'CHECK YOUR EMAIL' : signup ? 'ACCOUNT SETUP' : recover ? 'SECURE YOUR ACCOUNT' : 'WELCOME BACK'),
+      el('h2', {}, sent ? 'Your setup link is on its way.' : signup ? 'Create your account.' : recover ? 'Choose your password' : 'Your website starts here.'),
+      el('p', { class: 'muted' }, sent ? `If ${submittedEmail} is approved for a website, open the link we sent, then choose your password.` : signup ? 'Enter the email Owen approved for your website. We’ll send a secure link to finish setup.' : recover ? 'Use a password you do not use elsewhere.' : 'Sign in to edit your website.'),
+      !sent && form, sent && el('div', { class: 'account-links' }, resend, signIn), !sent && !recover && !signup && forgot,
+      !sent && S.config?.signupEnabled && !recover && (signup ? signIn : registration),
+      el('p', { class: 'help' }, 'Need access or no email arrived? Contact Owen to check your approved address.')))));
 }
 async function signOut() {
   if (S.dirty && !confirm('You have unsaved changes. Sign out and discard them?')) return;
@@ -289,15 +317,19 @@ async function start() {
       app.replaceChildren(el('main', { class: 'setup' }, branding(), el('h1', {}, 'Your portal is almost ready.'), el('p', {}, 'Owen needs to finish connecting account access and website publishing before you can sign in.'), el('p', { class: 'muted' }, 'If you are setting up this portal, follow START-HERE.md in the download.'))); return;
     }
     const hash = new URLSearchParams(location.hash.slice(1));
+    const linkError = hash.get('error_description') || (hash.has('error') ? 'This email link could not be used. Request a new link.' : '');
     if (hash.has('access_token')) {
-      const token = Object.fromEntries(hash); S.recovery = ['recovery', 'invite'].includes(token.type); token.expires_in = Number(token.expires_in); token.expires_at = Number(token.expires_at) || undefined;
-      window.history.replaceState(null, '', location.pathname); setSession(token);
+      const token = Object.fromEntries(hash); S.recovery = ['recovery', 'invite', 'magiclink', 'signup'].includes(token.type); token.expires_in = Number(token.expires_in); token.expires_at = Number(token.expires_at) || undefined;
+      window.history.replaceState(null, '', location.pathname + location.search); setSession(token);
+    } else if (linkError) {
+      window.history.replaceState(null, '', location.pathname + location.search);
     } else {
       try { S.session = JSON.parse(sessionStorage.getItem('owen-portal-session')); } catch { setSession(null); }
     }
-    if (S.recovery) login(true);
+    if (S.recovery) login('password');
     else if (S.session) { try { await openWorkspace(); } catch (e) { setSession(null); login(); toast(e.message, true); } }
     else login();
+    if (linkError) toast(linkError, true);
   } catch { app.replaceChildren(el('main', { class: 'setup' }, branding(), el('h1', {}, 'Connection unavailable'), el('p', {}, 'The portal could not connect. Please try again.'), button('Try again', () => location.reload()))); }
 }
 start();

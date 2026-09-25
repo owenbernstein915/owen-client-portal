@@ -11,12 +11,26 @@ const publishedPath = '.client-portal/published.json';
 const jsonText = value => JSON.stringify(value, null, 2) + '\n';
 const fingerprint = content => createHash('sha256').update(JSON.stringify(content)).digest('hex');
 const encPath = value => value.split('/').map(encodeURIComponent).join('/');
+const portalUrl = 'https://owenbclientdashboard.netlify.app/';
 
-export function accessFor(userId, env) {
+function approvedEmail(email, env) {
+  if (typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  let entries;
+  try { entries = JSON.parse(env.PORTAL_SIGNUP_ALLOWLIST_JSON || '{}'); }
+  catch { fail(503, 'Client account approvals need to be configured by Owen.'); }
+  if (!entries || typeof entries !== 'object' || Array.isArray(entries)) fail(503, 'Client account approvals need to be configured by Owen.');
+  const key = email.trim().toLowerCase();
+  const entry = Object.hasOwn(entries, key) ? entries[key] : null;
+  if (!entry || !['admin', 'editor'].includes(entry.role) || !Array.isArray(entry.sites) ||
+      !entry.sites.length || entry.sites.some(id => !clients.some(client => client.id === id))) return null;
+  return { role: entry.role, sites: entry.role === 'admin' ? clients.map(c => c.id) : entry.sites };
+}
+
+export function accessFor(userId, env, verifiedEmail) {
   let entries;
   try { entries = JSON.parse(env.PORTAL_ACCESS_JSON || '{}'); }
   catch { fail(503, 'Account access needs to be configured by Owen.'); }
-  const entry = Object.hasOwn(entries, userId) ? entries[userId] : null;
+  const entry = Object.hasOwn(entries, userId) ? entries[userId] : approvedEmail(verifiedEmail, env);
   if (!entry || !['admin', 'editor'].includes(entry.role) || !Array.isArray(entry.sites)) {
     fail(403, 'Your account has not been assigned a website. Please contact Owen.');
   }
@@ -195,10 +209,27 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
   return async function handler(request) {
     try {
       const url = new URL(request.url); const action = url.searchParams.get('action') || 'config';
-      const methods = { config: 'GET', sites: 'GET', content: 'GET', draft: 'PUT', publish: 'POST', status: 'GET', image: 'GET', history: 'GET', version: 'GET' };
+      const methods = { config: 'GET', signup: 'POST', sites: 'GET', content: 'GET', draft: 'PUT', publish: 'POST', status: 'GET', image: 'GET', history: 'GET', version: 'GET' };
       if (!methods[action]) fail(404, 'Unknown action.');
       if (request.method !== methods[action]) fail(405, 'Method not allowed.');
-      if (action === 'config') return respond({ configured: !!(env.SUPABASE_URL && env.SUPABASE_PUBLISHABLE_KEY && env.GITHUB_TOKEN && env.PORTAL_ACCESS_JSON), supabaseUrl: env.SUPABASE_URL || '', supabaseKey: env.SUPABASE_PUBLISHABLE_KEY || '' });
+      if (action === 'config') return respond({ configured: !!(env.SUPABASE_URL && env.SUPABASE_PUBLISHABLE_KEY && env.GITHUB_TOKEN && (env.PORTAL_ACCESS_JSON || env.PORTAL_SIGNUP_ALLOWLIST_JSON)), signupEnabled: !!env.PORTAL_SIGNUP_ALLOWLIST_JSON, supabaseUrl: env.SUPABASE_URL || '', supabaseKey: env.SUPABASE_PUBLISHABLE_KEY || '' });
+      if (action === 'signup') {
+        if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY || !env.PORTAL_SIGNUP_ALLOWLIST_JSON) fail(503, 'Client signup is not configured yet.');
+        const email = (await readBody(request))?.email;
+        if (typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) fail(400, 'Enter a valid email address.');
+        const normalized = email.trim().toLowerCase();
+        if (!approvedEmail(normalized, env)) return respond({ sent: true });
+        const authUrl = env.SUPABASE_URL.replace(/\/$/, '');
+        const headers = { apikey: env.SUPABASE_PUBLISHABLE_KEY, 'content-type': 'application/json' };
+        const settings = await external(`${authUrl}/auth/v1/settings`, { headers });
+        if (!settings.ok) fail(502, 'Account setup is temporarily unavailable. Please try again.');
+        const options = await settings.json();
+        if (options.disable_signup || options.external?.email === false || options.mailer_autoconfirm !== false) fail(503, 'Email confirmation must be enabled in Supabase before client signup can be used.');
+        const result = await external(`${authUrl}/auth/v1/otp?redirect_to=${encodeURIComponent(portalUrl)}`, { method: 'POST', headers, body: JSON.stringify({ email: normalized, create_user: true }) });
+        if (result.status === 429) fail(429, 'Too many email requests. Please wait a while before trying again.');
+        if (!result.ok) fail(502, 'The account email could not be sent. Please try again or contact Owen.');
+        return respond({ sent: true });
+      }
       const auth = request.headers.get('authorization') || '';
       if (!/^Bearer [A-Za-z0-9._-]+$/.test(auth)) fail(401, 'Please sign in to continue.');
       if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) fail(503, 'Login is not configured yet.');
@@ -206,7 +237,7 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
       if (!userResponse.ok) fail(401, 'Your session expired. Please sign in again.');
       const user = await userResponse.json();
       if (!user.id || !user.email_confirmed_at) fail(403, 'Please verify your email address before editing.');
-      const access = accessFor(user.id, env);
+      const access = accessFor(user.id, env, user.email);
       if (action === 'sites') return respond({ role: access.role, email: user.email, sites: clients.filter(c => access.sites.includes(c.id)).map(c => ({ id: c.id, name: c.name, location: c.location })) });
       const client = clientFor(url.searchParams.get('site'), access);
       if (action === 'content') return respond({ ...await state(client), schema: client.schema });

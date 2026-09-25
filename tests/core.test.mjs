@@ -6,10 +6,10 @@ import { makeHandler, accessFor, validateContent, validateUpload, clientFor } fr
 import { clients } from '../server/clients.mjs';
 const initial = { website: JSON.parse(await readFile(new URL('./fixtures/site.json', import.meta.url))), menus: JSON.parse(await readFile(new URL('./fixtures/menu.json', import.meta.url))) };
 const hash = x => createHash('sha1').update(JSON.stringify(x)).digest('hex');
-const env = { SUPABASE_URL: 'https://test.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'public-key', GITHUB_TOKEN: 'server-only', PORTAL_ACCESS_JSON: JSON.stringify({ editor: { role: 'editor', sites: ['libelula'] }, outsider: { role: 'editor', sites: [] }, admin: { role: 'admin', sites: [] } }) };
-function fakeRepo() {
+const env = { SUPABASE_URL: 'https://test.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'public-key', GITHUB_TOKEN: 'server-only', PORTAL_ACCESS_JSON: JSON.stringify({ editor: { role: 'editor', sites: ['libelula'] }, outsider: { role: 'editor', sites: [] }, admin: { role: 'admin', sites: [] } }), PORTAL_SIGNUP_ALLOWLIST_JSON: JSON.stringify({ 'new@little-daisy.test': { role: 'editor', sites: ['little-daisy'] }, 'new@libelula.test': { role: 'editor', sites: ['libelula'] } }) };
+function fakeRepo({ autoconfirm = false, otpStatus = 200 } = {}) {
   const blobs = new Map(), trees = new Map(), commits = new Map(), refs = new Map();
-  const writes = []; let sequence = 0;
+  const writes = [], otpCalls = []; let sequence = 0;
   const blob = content => { const id = hash(content); blobs.set(id, content); return id; };
   const initialTree = Object.fromEntries(clients[0].schema.map(s => [s.path, blob(JSON.stringify(initial[s.name], null, 2) + '\n')]));
   const treeId = hash(initialTree); trees.set(treeId, initialTree);
@@ -18,8 +18,15 @@ function fakeRepo() {
   async function fetcher(input, init = {}) {
     const url = new URL(input); const method = init.method || 'GET'; const body = init.body ? JSON.parse(init.body) : undefined;
     if (url.hostname === 'test.supabase.co') {
+      if (url.pathname === '/auth/v1/settings') return output({ disable_signup: false, mailer_autoconfirm: autoconfirm, external: { email: true } });
+      if (url.pathname === '/auth/v1/otp') { otpCalls.push({ url: input, body }); return output({}, otpStatus); }
       const id = init.headers.authorization?.slice(7);
-      return ['editor', 'outsider', 'admin'].includes(id) ? output({ id, email: id+'@example.com', email_confirmed_at: '2026-01-01' }) : output({}, 401);
+      const users = {
+        editor: { email: 'editor@example.com', confirmed: true }, outsider: { email: 'outsider@example.com', confirmed: true }, admin: { email: 'admin@example.com', confirmed: true },
+        'new-daisy': { email: 'new@little-daisy.test', confirmed: true }, 'new-lib': { email: 'new@libelula.test', confirmed: true },
+        unconfirmed: { email: 'new@libelula.test', confirmed: false },
+      };
+      return users[id] ? output({ id, email: users[id].email, email_confirmed_at: users[id].confirmed ? '2026-01-01' : null }) : output({}, 401);
     }
     const path = decodeURIComponent(url.pathname.replace('/repos/owenbernstein915/libelula-pages-cms', ''));
     if (method !== 'GET') writes.push({ path, method, body });
@@ -33,7 +40,7 @@ function fakeRepo() {
     if (path.startsWith('/git/refs/heads/')) { const branch = path.slice('/git/refs/heads/'.length); if (body.force || !commits.get(body.sha).parents.includes(refs.get(branch))) return output({}, 422); refs.set(branch, body.sha); return output({ object: { sha: body.sha } }); }
     throw new Error('Unexpected fake API route '+method+' '+path);
   }
-  return { fetcher, writes, refs, initialSha };
+  return { fetcher, writes, otpCalls, refs, initialSha };
 }
 function request(action, options = {}) {
   const q = new URLSearchParams({ action, site: options.site || 'libelula' });
@@ -51,6 +58,33 @@ test('client authorization is server-owned and denies unknown users and websites
   assert.throws(() => clientFor('libelula', accessFor('outsider', env)), /do not have access/);
   assert.equal(clientFor('libelula', accessFor('admin', env)).id, 'libelula');
   assert.equal(clientFor('little-daisy', accessFor('admin', env)).id, 'little-daisy');
+  assert.deepEqual(accessFor('new-daisy', env, 'new@little-daisy.test').sites, ['little-daisy']);
+  assert.throws(() => clientFor('libelula', accessFor('new-daisy', env, 'new@little-daisy.test')), /do not have access/);
+});
+test('approved email gets a Supabase setup link; unknown email never reaches Auth', async () => {
+  const repo = fakeRepo(); const handler = makeHandler({ env, fetcher: repo.fetcher });
+  const signup = email => new Request('https://portal.example/api/portal?action=signup', { method: 'POST', body: JSON.stringify({ email }) });
+  assert.equal((await handler(signup('not-approved@example.com'))).status, 200);
+  assert.equal(repo.otpCalls.length, 0);
+  assert.equal((await handler(signup(' NEW@LIBELULA.TEST '))).status, 200);
+  assert.equal(repo.otpCalls.length, 1);
+  assert.deepEqual(repo.otpCalls[0].body, { email: 'new@libelula.test', create_user: true });
+  assert.equal(new URL(repo.otpCalls[0].url).searchParams.get('redirect_to'), 'https://owenbclientdashboard.netlify.app/');
+  assert.equal(repo.writes.length, 0);
+});
+test('signup refuses unconfirmed-email configuration and enforces verified site access', async () => {
+  const signup = new Request('https://portal.example/api/portal?action=signup', { method: 'POST', body: JSON.stringify({ email: 'new@libelula.test' }) });
+  const insecure = fakeRepo({ autoconfirm: true });
+  assert.equal((await makeHandler({ env, fetcher: insecure.fetcher })(signup)).status, 503);
+  assert.equal(insecure.otpCalls.length, 0);
+  const repo = fakeRepo(); const handler = makeHandler({ env, fetcher: repo.fetcher });
+  assert.equal((await handler(request('sites', { token: 'unconfirmed' }))).status, 403);
+  const daisy = await (await handler(request('sites', { token: 'new-daisy' }))).json();
+  assert.deepEqual(daisy.sites.map(site => site.id), ['little-daisy']);
+  const lib = await (await handler(request('sites', { token: 'new-lib' }))).json();
+  assert.deepEqual(lib.sites.map(site => site.id), ['libelula']);
+  assert.equal((await handler(request('content', { token: 'new-daisy', site: 'libelula' }))).status, 403);
+  assert.equal(repo.writes.length, 0);
 });
 test('image uploads reject traversal and disguised non-image files', () => {
   assert.throws(() => validateUpload({ path: 'public/images/uploads/../../app.js', base64: 'YWJj' }, clients[0]), /filename/);
@@ -63,6 +97,7 @@ test('API verifies the session and isolates accounts before contacting GitHub', 
   }
   const config = await (await handler(request('config'))).json();
   assert.equal(config.configured, true); assert.equal(JSON.stringify(config).includes('server-only'), false);
+  assert.equal(JSON.stringify(config).includes('new@little-daisy.test'), false);
   assert.equal(repo.writes.length, 0);
 });
 test('draft saves leave main unchanged; publish writes only content and marker without force', async () => {

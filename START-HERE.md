@@ -2,7 +2,7 @@
 
 A separate client editing website for Netlify, styled to match owenbwebdesign.com: black backgrounds, off-white text, Arial typography, thin borders, rounded buttons, and your existing OB monogram. Libélula and Little Daisy are configured clients.
 
-**Status:** source code and an offline design preview are prepared. This package has not been deployed or connected to your GitHub write credentials, Supabase account, or Netlify account. The real portal refuses access until configured. No changes have been pushed to Libélula's repository.
+**Current account flow:** The deployed portal uses Supabase Auth for login and a server-side UUID mapping for existing accounts. The account-creation update adds an approved-email setup link and keeps the existing mappings. The older initial setup instructions below describe the original deployment and may not reflect current account settings.
 
 ## 1. See the design
 
@@ -35,9 +35,9 @@ Netlify will assign a project URL. You can add `clients.owenbwebdesign.com` as a
 Create a Supabase project. The portal uses Supabase only for email/password accounts; it does not need a custom database or a service-role key.
 
 1. Enable email/password authentication.
-2. Disable public signups: you control which business owners get accounts.
+2. Keep email signup enabled and require email confirmation. The portal checks its approved-email list before requesting a setup link, and its server rejects unapproved accounts for editing. Supabase's public Auth endpoint can still accept direct signups, but such accounts have no portal access.
 3. Set the Auth Site URL to your actual portal URL and add that same URL, ending in `/`, to the permitted redirect URLs.
-4. Create your own user and the client's user in Supabase Auth. Copy each user's UUID. The server maps UUIDs to client sites; email text or user-editable metadata does not grant access.
+4. Add each new client's email to `PORTAL_SIGNUP_ALLOWLIST_JSON`, mapped to the correct site. The client can then use **Create your account** in the portal. Existing users still have their UUID mapping in `PORTAL_ACCESS_JSON`.
 5. Set up production SMTP for invitation and password-reset emails. Supabase's built-in sender is limited and should not be relied on for client email delivery.
 6. Users can set their password from the invite link or the portal's password-reset flow. Complete a real invite and password-reset test before handing access to a business owner.
 
@@ -63,6 +63,7 @@ Set these on the **portal project**, scoped to Functions. Enter actual values in
 | `SUPABASE_PUBLISHABLE_KEY` | Its publishable key or legacy anon key; never a service-role key |
 | `GITHUB_TOKEN` | The fine-grained token from step 5 |
 | `PORTAL_ACCESS_JSON` | The UUID-to-site mapping below |
+| `PORTAL_SIGNUP_ALLOWLIST_JSON` | Approved lowercase emails mapped to roles and sites for self-setup |
 
 Replace both UUID placeholders:
 
@@ -71,6 +72,8 @@ Replace both UUID placeholders:
 ```
 
 An administrator sees all sites listed in `server/clients.mjs`. An editor sees only assigned site IDs. Removing a UUID from this mapping revokes portal access on subsequent requests once the updated environment is active. Redeploy after setting or changing these variables.
+
+For a new client, add an approved email like `{"client@example.com":{"role":"editor","sites":["libelula"]}}` to the single `PORTAL_SIGNUP_ALLOWLIST_JSON` value. Removing an approved email revokes email-based access, but a separate existing UUID mapping must also be removed if one exists for that account. Do not put either mapping in the public website code.
 
 Optional variables enable deployment status and automatic preview/live links:
 
@@ -123,7 +126,7 @@ The local test suite passed: original content validation; unsafe-link/empty-menu
 
 ## Add the next business
 
-Add a new entry in `server/clients.mjs` with a unique ID, its repository, production/draft branch, approved content-file schema, and image folder. Grant the corresponding user UUID that site ID in `PORTAL_ACCESS_JSON`, grant the GitHub connection access to that repository, and redeploy the portal. Websites with different structures need their own field schemas and must read those editable files.
+Add a new entry in `server/clients.mjs` with a unique ID, its repository, production/draft branch, approved content-file schema, and image folder. Approve the client's email and site ID in `PORTAL_SIGNUP_ALLOWLIST_JSON`, grant the GitHub connection access to that repository, and redeploy the portal. Websites with different structures need their own field schemas and must read those editable files.
 
 ## Local development
 
