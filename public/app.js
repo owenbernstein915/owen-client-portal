@@ -101,8 +101,11 @@ function login(mode = 'signin', submittedEmail = '') {
     el('section', { class: 'login-panel' }, el('div', { class: 'login-form' }, el('p', { class: 'eyebrow' }, sent ? 'CHECK YOUR EMAIL' : signup ? 'ACCOUNT SETUP' : recover ? 'SECURE YOUR ACCOUNT' : 'WELCOME BACK'),
       el('h2', {}, sent ? 'Your setup link is on its way.' : signup ? 'Create your account.' : recover ? 'Choose your password' : 'Your website starts here.'),
       el('p', { class: 'muted' }, sent ? `If ${submittedEmail} is approved for a website, open the link we sent, then choose your password.` : signup ? 'Enter the email Owen approved for your website. We’ll send a secure link to finish setup.' : recover ? 'Use a password you do not use elsewhere.' : 'Sign in to edit your website.'),
-      !sent && form, sent && el('div', { class: 'account-links' }, resend, signIn), !sent && !recover && !signup && forgot,
-      !sent && S.config?.signupEnabled && !recover && (signup ? signIn : registration),
+      !sent && form, sent && el('div', { class: 'account-links' }, resend, signIn),
+      !sent && !recover && !signup && el('div', { class: 'login-options' },
+        forgot,
+        S.config?.signupEnabled && el('div', { class: 'signup-prompt' }, el('span', {}, 'New to the portal?'), registration)),
+      !sent && signup && S.config?.signupEnabled && el('div', { class: 'login-options' }, signIn),
       el('p', { class: 'help' }, 'Need access or no email arrived? Contact Owen to check your approved address.')))));
 }
 async function signOut() {
