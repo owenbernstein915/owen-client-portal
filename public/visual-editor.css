@@ -1,0 +1,17 @@
+.visual-preview-card{color:#10293b}
+.visual-toolbar .eyebrow{color:#536575}
+.visual-toolbar h2{color:#10293b;font-weight:750}
+.visual-guidance,.visual-footnote{color:#536575}
+.visual-footnote{background:#fff}
+.visual-controls .button{min-height:44px;border:1px solid #708392;background:#fff;color:#10293b;box-shadow:0 1px 2px #10293b18;font-weight:700}
+.visual-controls .button.quiet{background:#fff;border-color:#708392;color:#10293b}
+.visual-controls .button:hover:not(:disabled){background:#eaf2ff;border-color:#175fd0;color:#10293b}
+.visual-controls .button.primary{background:#175fd0;border-color:#124ca9;color:#fff;box-shadow:0 2px 5px #174c9d32}
+.visual-controls .button.primary:hover:not(:disabled){background:#124ea9;border-color:#103f87;color:#fff}
+.visual-controls .button:disabled{opacity:.9;color:#10293b}
+.visual-controls .button.primary:disabled{opacity:.94;color:#fff}
+.visual-refresh-button .icon{width:16px;height:16px}
+@media(max-width:760px){
+  .visual-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .visual-controls .button{width:100%;font-size:.82rem;padding:.55rem .6rem}
+}

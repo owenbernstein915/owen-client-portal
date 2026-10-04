@@ -1,6 +1,8 @@
+import { createVisualRefreshUrl } from './visual-preview.mjs';
+
 const app = document.querySelector('#app');
 const notice = document.querySelector('#notice');
-const S = { config: null, session: null, sites: [], client: null, data: null, content: null, section: 'hero', document: 'website', dirty: false, busy: false, uploads: [], previews: new Map(), loadedImages: new Map(), status: null, pendingCommit: null, recovery: false, visual: false, visualFieldsOpen: false, visualDevice: 'desktop', visualUrl: '', visualOrigin: '', frameReady: false, visualOverrides: new Map(), visualUploadsLoading: new Map(), visualResizeObserver: null, visualSyncRevision: 0 };
+const S = { config: null, session: null, sites: [], client: null, data: null, content: null, section: 'hero', document: 'website', dirty: false, busy: false, uploads: [], previews: new Map(), loadedImages: new Map(), status: null, pendingCommit: null, recovery: false, visual: false, visualFieldsOpen: false, visualDevice: 'desktop', visualUrl: '', visualOrigin: '', frameReady: false, visualRefreshing: false, visualRefreshTimer: null, visualOverrides: new Map(), visualUploadsLoading: new Map(), visualResizeObserver: null, visualSyncRevision: 0 };
 let notificationTimer, refreshPromise;
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
@@ -8,6 +10,7 @@ const icons = {
   arrow: '<path d="M7 17 17 7M7 7h10v10"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/>',
+  refresh: '<path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 2M4 16l2 2a7 7 0 0 0 12.4-3"/>',
 };
 function icon(name) { const span = document.createElement('span'); span.className = 'icon'; span.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">${icons[name] || icons.grid}</svg>`; return span; }
 function el(tag, attrs = {}, ...children) {
@@ -43,6 +46,7 @@ function visualPageUrl() {
 }
 function toggleVisualEditor() {
   if (S.visual) {
+    cancelVisualRefresh();
     S.visual = false; S.visualFieldsOpen = false; S.frameReady = false;
     S.visualResizeObserver?.disconnect(); S.visualResizeObserver = null;
     render(); return;
@@ -51,6 +55,28 @@ function toggleVisualEditor() {
   if (!url) { toast('The visual editor is not configured for this website yet.', true); return; }
   S.visual = true; S.visualFieldsOpen = false; S.visualDevice = 'desktop'; S.visualUrl = url.href;
   S.visualOrigin = url.origin; S.frameReady = false; render();
+}
+function cancelVisualRefresh() {
+  clearTimeout(S.visualRefreshTimer); S.visualRefreshTimer = null; S.visualRefreshing = false;
+}
+function refreshVisualPreview() {
+  if (!S.visual || S.visualRefreshing) return;
+  try { S.visualUrl = createVisualRefreshUrl(S.visualUrl, S.visualOrigin, Date.now()); }
+  catch { toast('This website preview cannot be refreshed safely.', true); return; }
+  S.visualRefreshing = true; S.frameReady = false; S.visualSyncRevision += 1;
+  render();
+  S.visualRefreshTimer = setTimeout(() => {
+    if (!S.visualRefreshing) return;
+    S.visualRefreshing = false; S.visualRefreshTimer = null; updateVisualRefreshControl();
+    toast('The latest site build did not finish loading. Check your connection and try again.', true);
+  }, 30000);
+}
+function updateVisualRefreshControl() {
+  const control = document.querySelector('#refresh-visual-preview');
+  if (!control) return;
+  control.disabled = S.visualRefreshing;
+  const label = control.querySelector('[data-refresh-label]');
+  if (label) label.textContent = S.visualRefreshing ? 'Refreshing…' : 'Refresh preview';
 }
 function collectVisualImagePaths(value, paths = new Set()) {
   if (typeof value === 'string') {
@@ -103,7 +129,14 @@ function visualMessage(event) {
   if (!message || message.siteId !== S.client?.id) return;
   if (message.type === 'owen-portal:ready') {
     S.frameReady = true; S.visualOverrides.clear(); S.visualUploadsLoading.clear();
-    syncVisualContent('owen-portal:init'); return;
+    const refreshed = S.visualRefreshing;
+    if (refreshed) { cancelVisualRefresh(); updateVisualRefreshControl(); }
+    syncVisualContent('owen-portal:init').then(() => {
+      if (refreshed && S.visual && frame === document.querySelector('#visual-site-frame')) {
+        toast('Latest published site build loaded. Your current edits remain in the preview.');
+      }
+    });
+    return;
   }
   if (message.type === 'owen-portal:edit') openVisualField(message.path);
 }
@@ -330,6 +363,8 @@ function visualPanel() {
     el('div', { class: 'visual-controls', role: 'group', 'aria-label': 'Preview size' },
       button('Desktop', () => { S.visualDevice = 'desktop'; render(); }, 'button' + (S.visualDevice === 'desktop' ? ' primary' : ''), { 'aria-pressed': String(S.visualDevice === 'desktop') }),
       button('Mobile', () => { S.visualDevice = 'mobile'; render(); }, 'button' + (S.visualDevice === 'mobile' ? ' primary' : ''), { 'aria-pressed': String(S.visualDevice === 'mobile') }),
+      button([icon('refresh'), el('span', { 'data-refresh-label': '' }, S.visualRefreshing ? 'Refreshing…' : 'Refresh preview')], refreshVisualPreview,
+        'button visual-refresh-button', { id: 'refresh-visual-preview', title: 'Load the latest published site build while keeping your editor changes', 'aria-label': 'Refresh latest published site build', disabled: S.visualRefreshing }),
       button('Close', toggleVisualEditor, 'button quiet')));
   return el('section', { class: 'visual-preview-card', 'aria-label': 'Live website visual preview' },
     toolbar,
