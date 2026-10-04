@@ -81,8 +81,10 @@ test('signup refuses unconfirmed-email configuration and enforces verified site 
   assert.equal((await handler(request('sites', { token: 'unconfirmed' }))).status, 403);
   const daisy = await (await handler(request('sites', { token: 'new-daisy' }))).json();
   assert.deepEqual(daisy.sites.map(site => site.id), ['little-daisy']);
+  assert.equal(daisy.sites[0].previewUrl, 'https://littledaisybakeshop.com/');
   const lib = await (await handler(request('sites', { token: 'new-lib' }))).json();
   assert.deepEqual(lib.sites.map(site => site.id), ['libelula']);
+  assert.equal(lib.sites[0].previewUrl, 'https://libelulamontclair.com/');
   assert.equal((await handler(request('content', { token: 'new-daisy', site: 'libelula' }))).status, 403);
   assert.equal(repo.writes.length, 0);
 });

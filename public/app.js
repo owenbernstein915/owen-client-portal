@@ -1,12 +1,13 @@
 const app = document.querySelector('#app');
 const notice = document.querySelector('#notice');
-const S = { config: null, session: null, sites: [], client: null, data: null, content: null, section: 'hero', document: 'website', dirty: false, busy: false, uploads: [], previews: new Map(), loadedImages: new Map(), status: null, pendingCommit: null, recovery: false };
+const S = { config: null, session: null, sites: [], client: null, data: null, content: null, section: 'hero', document: 'website', dirty: false, busy: false, uploads: [], previews: new Map(), loadedImages: new Map(), status: null, pendingCommit: null, recovery: false, visual: false, visualFieldsOpen: false, visualDevice: 'desktop', visualUrl: '', visualOrigin: '', frameReady: false, visualOverrides: new Map(), visualUploadsLoading: new Map(), visualResizeObserver: null, visualSyncRevision: 0 };
 let notificationTimer, refreshPromise;
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   menu: '<path d="M4 5h16M4 12h16M4 19h16"/>',
   arrow: '<path d="M7 17 17 7M7 7h10v10"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/>',
 };
 function icon(name) { const span = document.createElement('span'); span.className = 'icon'; span.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">${icons[name] || icons.grid}</svg>`; return span; }
 function el(tag, attrs = {}, ...children) {
@@ -29,6 +30,101 @@ function setSession(data) {
   S.session = data ? { ...data, expires_at: data.expires_at || Math.floor(Date.now() / 1000) + (data.expires_in || 3600) } : null;
   if (S.session) sessionStorage.setItem('owen-portal-session', JSON.stringify(S.session));
   else sessionStorage.removeItem('owen-portal-session');
+}
+function visualPageUrl() {
+  const expected = { libelula: 'https://libelulamontclair.com', 'little-daisy': 'https://littledaisybakeshop.com' }[S.client?.id];
+  if (!expected || !S.client?.previewUrl) return null;
+  try {
+    const url = new URL(S.client.previewUrl);
+    if (url.origin !== expected || url.protocol !== 'https:') return null;
+    url.searchParams.set('portalEditor', '1');
+    return url;
+  } catch { return null; }
+}
+function toggleVisualEditor() {
+  if (S.visual) {
+    S.visual = false; S.visualFieldsOpen = false; S.frameReady = false;
+    S.visualResizeObserver?.disconnect(); S.visualResizeObserver = null;
+    render(); return;
+  }
+  const url = visualPageUrl();
+  if (!url) { toast('The visual editor is not configured for this website yet.', true); return; }
+  S.visual = true; S.visualFieldsOpen = false; S.visualDevice = 'desktop'; S.visualUrl = url.href;
+  S.visualOrigin = url.origin; S.frameReady = false; render();
+}
+function collectVisualImagePaths(value, paths = new Set()) {
+  if (typeof value === 'string') {
+    if (/^\/images\/uploads\/[a-zA-Z0-9_./-]+\.(png|jpe?g|webp|avif)$/i.test(value)) paths.add(value);
+  } else if (Array.isArray(value)) value.forEach(item => collectVisualImagePaths(item, paths));
+  else if (value && typeof value === 'object') Object.values(value).forEach(item => collectVisualImagePaths(item, paths));
+  return paths;
+}
+function encodeBlob(blob) {
+  return blob.arrayBuffer().then(buffer => {
+    const bytes = new Uint8Array(buffer); let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return 'data:' + (blob.type || 'image/webp') + ';base64,' + btoa(binary);
+  });
+}
+async function visualImageOverride(path) {
+  if (S.visualOverrides.has(path)) return S.visualOverrides.get(path);
+  const uploadPath = 'public' + path;
+  const local = S.uploads.find(item => item.path === uploadPath);
+  if (local) {
+    const dataUrl = 'data:image/webp;base64,' + local.base64;
+    S.visualOverrides.set(path, dataUrl); return dataUrl;
+  }
+  const savedUploads = S.data?.uploads || [];
+  if (!S.data?.hasDraft || !S.data.draftSha || !savedUploads.includes(uploadPath)) return null;
+  if (!S.visualUploadsLoading.has(path)) {
+    const pending = api('image', { query: { path, sha: S.data.draftSha }, blob: true })
+      .then(encodeBlob).then(dataUrl => { S.visualOverrides.set(path, dataUrl); return dataUrl; })
+      .catch(() => null).finally(() => S.visualUploadsLoading.delete(path));
+    S.visualUploadsLoading.set(path, pending);
+  }
+  return S.visualUploadsLoading.get(path);
+}
+async function syncVisualContent(type = 'owen-portal:update') {
+  const frame = document.querySelector('#visual-site-frame');
+  if (!S.visual || !S.frameReady || !frame?.contentWindow) return;
+  const revision = ++S.visualSyncRevision;
+  const paths = [...collectVisualImagePaths(S.content)];
+  await Promise.all(paths.map(visualImageOverride));
+  if (!S.visual || !S.frameReady || revision !== S.visualSyncRevision || frame !== document.querySelector('#visual-site-frame')) return;
+  frame.contentWindow.postMessage({
+    type, siteId: S.client.id, content: S.content,
+    imageOverrides: Object.fromEntries([...S.visualOverrides].filter(([path]) => paths.includes(path))),
+  }, S.visualOrigin);
+}
+function visualMessage(event) {
+  const frame = document.querySelector('#visual-site-frame');
+  if (!S.visual || !frame || event.source !== frame.contentWindow || event.origin !== S.visualOrigin) return;
+  const message = event.data;
+  if (!message || message.siteId !== S.client?.id) return;
+  if (message.type === 'owen-portal:ready') {
+    S.frameReady = true; S.visualOverrides.clear(); S.visualUploadsLoading.clear();
+    syncVisualContent('owen-portal:init'); return;
+  }
+  if (message.type === 'owen-portal:edit') openVisualField(message.path);
+}
+function openVisualField(path) {
+  if (!Array.isArray(path) || !path.length || !path.every(part => typeof part === 'string' || Number.isInteger(part))) return;
+  const doc = S.data?.schema.find(item => item.name === path[0]);
+  if (!doc) return;
+  if (!doc.list && (typeof path[1] !== 'string' || !doc.fields.some(field => field.name === path[1]))) return;
+  S.document = doc.name; S.section = doc.list ? doc.fields[0]?.name : path[1]; S.visualFieldsOpen = true; render();
+  requestAnimationFrame(() => {
+    const candidates = [...document.querySelectorAll('#editor [data-portal-path]')];
+    const target = candidates.find(node => {
+      try { const fieldPath = JSON.parse(node.dataset.portalPath); return path.every((part, index) => fieldPath[index] === part); }
+      catch { return false; }
+    });
+    if (!target) return;
+    let parent = target.parentElement;
+    while (parent && parent !== document.querySelector('#editor')) { if (parent.tagName === 'DETAILS') parent.open = true; parent = parent.parentElement; }
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (target.matches('input:not([type="file"]), textarea, select')) target.focus({ preventScroll: true });
+  });
 }
 async function auth(path, body, method = 'POST', bearer) {
   const res = await fetch(`${S.config.supabaseUrl}/auth/v1/${path}`, { method, headers: { apikey: S.config.supabaseKey, 'content-type': 'application/json', ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -126,13 +222,13 @@ async function openWorkspace() {
 }
 async function loadContent() {
   app.replaceChildren(el('div', { class: 'loading' }, 'Loading your website…'));
-  const data = await api('content'); clearPreviews(); S.data = data; S.content = structuredClone(data.content); S.dirty = false; S.busy = false;
+  const data = await api('content'); clearPreviews(); S.visualOverrides.clear(); S.visualUploadsLoading.clear(); S.data = data; S.content = structuredClone(data.content); S.dirty = false; S.busy = false;
   S.document = data.schema.find(d => d.name === S.document)?.name || data.schema[0].name;
   const doc = data.schema.find(d => d.name === S.document);
   S.section = doc.fields.find(f => f.name === S.section)?.name || doc.fields[0]?.name;
   render(); refreshStatus();
 }
-function dirty() { S.dirty = true; updateControls(); }
+function dirty() { S.dirty = true; updateControls(); syncVisualContent(); }
 function get(path) { return path.reduce((a, p) => a?.[p], S.content); }
 function set(path, value) { let dest = S.content; for (const p of path.slice(0, -1)) dest = dest[p]; dest[path.at(-1)] = value; dirty(); }
 function dateText(value) { return value ? new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value)) : ''; }
@@ -150,8 +246,9 @@ async function save() {
   if (!form.reportValidity()) return;
   S.busy = true; updateControls(); document.querySelector('#editor').inert = true;
   try {
+    const savedUploads = S.uploads.map(upload => upload.path);
     const result = await api('draft', { method: 'PUT', body: { content: S.content, uploads: S.uploads, draftSha: S.data.draftSha, baseMainSha: S.data.baseMainSha } });
-    Object.assign(S.data, result); S.dirty = false; S.uploads = []; toast('Draft saved. Your live website has not changed.');
+    Object.assign(S.data, result); S.data.uploads = [...new Set([...(S.data.uploads || []), ...savedUploads])]; S.dirty = false; S.uploads = []; toast('Draft saved. Your live website has not changed.');
   } catch (e) { toast(e.message, true); }
   finally { S.busy = false; document.querySelector('#editor').inert = false; updateControls(); }
 }
@@ -212,13 +309,41 @@ async function history() {
     dialog.addEventListener('close', () => dialog.remove()); document.body.append(dialog); dialog.showModal();
   } catch (e) { toast(e.message, true); }
 }
+function resizeVisualFrame() {
+  const shell = document.querySelector('.visual-frame-shell'); const frame = document.querySelector('#visual-site-frame');
+  if (!shell || !frame) return;
+  const width = S.visualDevice === 'mobile' ? 390 : 1280;
+  const height = S.visualDevice === 'mobile' ? 844 : 900;
+  const scale = Math.min(1, shell.clientWidth / width);
+  frame.style.width = width + 'px'; frame.style.height = height + 'px';
+  frame.style.transform = 'scale(' + scale + ')';
+  shell.style.height = Math.round(height * scale) + 'px';
+}
+function visualPanel() {
+  const frame = el('iframe', {
+    id: 'visual-site-frame', title: S.client.name + ' live site preview', src: S.visualUrl,
+    class: 'visual-site-frame', sandbox: 'allow-scripts allow-same-origin', referrerpolicy: 'no-referrer',
+  });
+  const toolbar = el('div', { class: 'visual-toolbar' },
+    el('div', {}, el('p', { class: 'eyebrow' }, 'VISUAL EDITOR'), el('h2', {}, S.client.name),
+      el('p', { class: 'visual-guidance' }, 'Click a pencil on the site to edit that section. Changes appear here and stay private until you save a draft.')),
+    el('div', { class: 'visual-controls', role: 'group', 'aria-label': 'Preview size' },
+      button('Desktop', () => { S.visualDevice = 'desktop'; render(); }, 'button' + (S.visualDevice === 'desktop' ? ' primary' : ''), { 'aria-pressed': String(S.visualDevice === 'desktop') }),
+      button('Mobile', () => { S.visualDevice = 'mobile'; render(); }, 'button' + (S.visualDevice === 'mobile' ? ' primary' : ''), { 'aria-pressed': String(S.visualDevice === 'mobile') }),
+      button('Close', toggleVisualEditor, 'button quiet')));
+  return el('section', { class: 'visual-preview-card', 'aria-label': 'Live website visual preview' },
+    toolbar,
+    el('div', { class: 'visual-frame-shell ' + S.visualDevice }, frame),
+    el('p', { class: 'visual-footnote' }, 'This is the real website in preview mode. Site visitors continue seeing the published content until you publish your draft.'));
+}
 function render() {
+  if (S.visual) { S.frameReady = false; S.visualResizeObserver?.disconnect(); S.visualResizeObserver = null; }
   const doc = S.data.schema.find(d => d.name === S.document);
   const selected = doc.list ? doc : doc.fields.find(f => f.name === S.section) || doc.fields[0];
   const nav = S.data.schema.map(d => button([icon(d.list ? 'menu' : 'grid'), el('span', {}, d.list ? 'Menus' : 'Website content')], () => { S.document = d.name; S.section = d.fields[0]?.name; render(); }, `nav-button ${d.name === S.document ? 'active' : ''}`));
   const sitePicker = S.sites.length > 1 ? el('select', { 'aria-label': 'Website', onChange: async e => {
     if (S.dirty && !confirm('Discard unsaved changes and switch websites?')) { e.target.value = S.client.id; return; }
-    S.client = S.sites.find(c => c.id === e.target.value); S.pendingCommit = null;
+    S.client = S.sites.find(c => c.id === e.target.value); S.pendingCommit = null; S.visual = false; S.visualFieldsOpen = false;
     try { await loadContent(); } catch (err) { toast(err.message, true); }
   } }, ...S.sites.map(c => el('option', { value: c.id, selected: c.id === S.client.id }, c.name))) : el('strong', {}, S.client.name);
   const sidebar = el('aside', { class: 'sidebar' }, branding(), el('div', { class: 'workspace-label' }, 'YOUR WORKSPACE'), el('div', { class: 'site-name' }, sitePicker, el('small', {}, S.client.location)),
@@ -233,13 +358,23 @@ function render() {
     if (S.dirty && !confirm('Discard your unsaved changes and reload?')) return;
     try { await loadContent(); } catch (e) { toast(e.message, true); }
   }), el('label', { class: 'button' }, 'Import draft', el('input', { type: 'file', accept: '.json', class: 'file-input', onChange: e => e.target.files[0] && importDraft(e.target.files[0]) }))));
+  const editorCard = el('section', { class: 'editor-card' + (S.visual ? ' visual-form-drawer' : ''), hidden: S.visual && !S.visualFieldsOpen },
+    el('div', { class: 'editor-heading' }, el('div', {}, el('p', { class: 'eyebrow' }, doc.list ? 'FOOD & DRINK' : 'EDIT CONTENT'), el('h2', {}, doc.list ? 'Your menus' : selected.label)),
+      el('div', { class: 'editor-heading-controls' }, sections, S.visual && button('Close editor', () => { S.visualFieldsOpen = false; render(); }, 'text-button'))), editor);
+  const stage = el('div', { class: S.visual ? 'visual-stage' : 'editor-stage' }, S.visual && visualPanel(), editorCard);
   app.replaceChildren(el('div', { class: 'shell' }, sidebar, el('main', { class: 'main' },
     el('header', { class: 'topbar' }, el('div', {}, el('p', { class: 'eyebrow' }, 'CLIENT PORTAL'), el('h1', {}, 'Your website')),
-      el('a', { id: 'live-link', class: 'button live-link', target: '_blank', rel: 'noopener noreferrer', hidden: true }, 'View live site', icon('arrow'))),
+      el('div', { class: 'topbar-actions' }, button(S.visual ? 'Close visual editor' : 'Visual editor', toggleVisualEditor, 'button' + (S.visual ? ' primary' : ' quiet'), { 'aria-expanded': String(S.visual) }),
+        el('a', { id: 'live-link', class: 'button live-link', target: '_blank', rel: 'noopener noreferrer', hidden: true }, 'View live site', icon('arrow')))),
     el('div', { class: 'status-strip' }, el('span', { id: 'deploy-status' }, 'Checking build status…'), el('span', { class: 'muted' }, 'Only published changes appear on your website.')),
     S.data.stale && el('div', { class: 'warning', role: 'alert' }, 'The live website changed after this draft began. Export this draft and contact Owen to reconcile the changes before publishing.'),
-    el('section', { class: 'editor-card' }, el('div', { class: 'editor-heading' }, el('div', {}, el('p', { class: 'eyebrow' }, doc.list ? 'FOOD & DRINK' : 'EDIT CONTENT'), el('h2', {}, doc.list ? 'Your menus' : selected.label)), sections), editor),
+    stage,
     tools, el('footer', { class: 'actionbar' }, el('div', {}, el('strong', { id: 'save-status' }), el('small', {}, 'Save a draft, then publish when you’re ready.')), el('div', { class: 'actions' }, button('Preview draft', previewDraft, 'button quiet'), button('Save draft', save, 'button', { id: 'save' }), button('Publish changes', publish, 'button primary', { id: 'publish' }))))));
+  if (S.visual) {
+    const shell = document.querySelector('.visual-frame-shell');
+    if (shell && 'ResizeObserver' in window) { S.visualResizeObserver = new ResizeObserver(resizeVisualFrame); S.visualResizeObserver.observe(shell); }
+    resizeVisualFrame();
+  }
   updateControls(); if (S.status) refreshStatus();
 }
 function defaultValue(f) {
@@ -265,15 +400,15 @@ function field(f, path, root = false) {
     return area;
   }
   if (f.type === 'object' || f.type === 'file') return el('div', { class: 'field-grid' }, ...f.fields.filter(child => !child.readonly).map(child => field(child, [...path, child.name])));
-  if (f.type === 'boolean') return el('label', { class: 'toggle-field' }, el('span', {}, label), el('input', { type: 'checkbox', role: 'switch', checked: value === true, onChange: e => set(path, e.target.checked) }));
+  if (f.type === 'boolean') return el('label', { class: 'toggle-field' }, el('span', {}, label), el('input', { type: 'checkbox', role: 'switch', 'data-portal-path': JSON.stringify(path), checked: value === true, onChange: e => set(path, e.target.checked) }));
   if (f.type === 'image') return imageField(f, path, value);
   if (f.type === 'select') {
     const values = f.options?.values || [];
-    const input = el('select', { required: f.required, onChange: e => set(path, e.target.value) }, ...values.map(option => el('option', { value: option.name, selected: value === option.name }, option.label || option.name)));
+    const input = el('select', { required: f.required, 'data-portal-path': JSON.stringify(path), onChange: e => set(path, e.target.value) }, ...values.map(option => el('option', { value: option.name, selected: value === option.name }, option.label || option.name)));
     return el('label', { class: 'field' }, el('span', {}, label, f.required && el('span', { class: 'required' }, ' *')), input, f.description && el('small', { class: 'muted' }, f.description));
   }
   const multiline = f.type === 'text';
-  const input = el(multiline ? 'textarea' : 'input', { ...(multiline ? { rows: 4 } : { type: f.name === 'email' ? 'email' : 'text' }), required: f.required, readonly: f.readonly, maxlength: multiline ? '15000' : '3000', onInput: e => set(path, e.target.value) });
+  const input = el(multiline ? 'textarea' : 'input', { ...(multiline ? { rows: 4 } : { type: f.name === 'email' ? 'email' : 'text' }), 'data-portal-path': JSON.stringify(path), required: f.required, readonly: f.readonly, maxlength: multiline ? '15000' : '3000', onInput: e => set(path, e.target.value) });
   input.value = value || '';
   return el('label', { class: `field ${multiline ? 'span-full' : ''}` }, el('span', {}, label, f.required && el('span', { class: 'required' }, ' *')), input, f.description && el('small', { class: 'muted' }, f.description));
 }
@@ -290,7 +425,7 @@ function imageField(f, path, value) {
       Promise.resolve(S.loadedImages.get(key)).then(url => { if (url) { image.src = url; caption.textContent = 'Current photo'; } else caption.textContent = 'Photo preview unavailable'; });
     }
   }
-  const upload = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/avif', class: 'file-input', onChange: async e => {
+  const upload = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/avif', class: 'file-input', 'data-portal-path': JSON.stringify(path), onChange: async e => {
     const file = e.target.files[0]; if (!file) return;
     try {
       if (file.size > 20000000) throw new Error('Choose a photo smaller than 20 MB.');
@@ -313,6 +448,7 @@ function imageField(f, path, value) {
 }
 window.addEventListener('beforeunload', e => { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
 setInterval(refreshStatus, 20000);
+window.addEventListener('message', visualMessage);
 async function start() {
   try {
     S.config = await fetch('/api/portal?action=config').then(r => r.json());

@@ -238,7 +238,7 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
       const user = await userResponse.json();
       if (!user.id || !user.email_confirmed_at) fail(403, 'Please verify your email address before editing.');
       const access = accessFor(user.id, env, user.email);
-      if (action === 'sites') return respond({ role: access.role, email: user.email, sites: clients.filter(c => access.sites.includes(c.id)).map(c => ({ id: c.id, name: c.name, location: c.location })) });
+      if (action === 'sites') return respond({ role: access.role, email: user.email, sites: clients.filter(c => access.sites.includes(c.id)).map(c => ({ id: c.id, name: c.name, location: c.location, previewUrl: c.liveUrl })) });
       const client = clientFor(url.searchParams.get('site'), access);
       if (action === 'content') return respond({ ...await state(client), schema: client.schema });
       if (action === 'draft') return respond(await saveDraft(client, await readBody(request)));

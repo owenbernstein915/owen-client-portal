@@ -12,7 +12,7 @@ export const clients = [{
   branch: 'main',
   draftBranch: 'client-portal-draft',
   netlifySiteIdEnv: 'LIBELULA_NETLIFY_SITE_ID',
-  liveUrl: '', // Set the actual live URL here if not using the Netlify API.
+  liveUrl: 'https://libelulamontclair.com/',
   draftUrl: '', // Optional verified Netlify branch-deploy URL.
   uploadPrefix: 'public/images/uploads/',
   schema: libelulaSchema,
@@ -25,7 +25,7 @@ export const clients = [{
   branch: 'main',
   draftBranch: 'client-portal-draft',
   netlifySiteIdEnv: 'LITTLE_DAISY_NETLIFY_SITE_ID',
-  liveUrl: '',
+  liveUrl: 'https://littledaisybakeshop.com/',
   draftUrl: '',
   uploadPrefix: 'public/images/uploads/',
   schema: littleDaisySchema,
