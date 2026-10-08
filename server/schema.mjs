@@ -96,6 +96,41 @@ export default [
         ]
       },
       {
+        "name": "giftCards",
+        "label": "Gift Cards Page",
+        "type": "object",
+        "fields": [
+          {
+            "name": "eyebrow",
+            "label": "Small heading",
+            "type": "string"
+          },
+          {
+            "name": "title",
+            "label": "Page title",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text"
+          },
+          {
+            "name": "buttonText",
+            "label": "Button text",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "buttonUrl",
+            "label": "Digital storefront link",
+            "type": "string",
+            "required": true
+          }
+        ]
+      },
+      {
         "name": "bakery",
         "label": "Bakery Section",
         "type": "object",

@@ -50,6 +50,9 @@ test('existing Libélula content validates; malicious links and empty menus are 
   validateContent(initial, clients[0]);
   const content = structuredClone(initial); content.website.hero.buttonUrl = 'javascript:alert(1)';
   assert.throws(() => validateContent(content, clients[0]), /valid website/);
+  const badGiftCardLink = structuredClone(initial);
+  badGiftCardLink.website.giftCards.buttonUrl = 'javascript:alert(1)';
+  assert.throws(() => validateContent(badGiftCardLink, clients[0]), /valid website/);
   assert.throws(() => validateContent({ ...initial, menus: [] }, clients[0]), /number of entries/);
   assert.throws(() => validateContent({ menus: initial.menus }, clients[0]), /required/);
 });
@@ -106,12 +109,14 @@ test('draft saves leave main unchanged; publish writes only content and marker w
   const repo = fakeRepo(); const handler = makeHandler({ env, fetcher: repo.fetcher });
   const state = await (await handler(request('content'))).json(); assert.equal(state.hasDraft, false);
   const content = structuredClone(state.content); content.website.announcement.enabled = true; content.website.announcement.text = 'Holiday hours';
+  content.website.giftCards.buttonUrl = 'https://gift-store.example/gift-cards';
   const saved = await handler(request('draft', { method: 'PUT', body: { content, uploads: [], draftSha: state.draftSha, baseMainSha: state.baseMainSha } }));
   assert.equal(saved.status, 200, await saved.clone().text()); const draft = await saved.json();
   assert.equal(repo.refs.get('main'), repo.initialSha); assert.notEqual(repo.refs.get('client-portal-draft'), repo.initialSha);
   const published = await handler(request('publish', { method: 'POST', body: { draftSha: draft.draftSha } }));
   assert.equal(published.status, 200, await published.clone().text());
   const next = await (await handler(request('content'))).json(); assert.equal(next.hasDraft, false); assert.equal(next.content.website.announcement.text, 'Holiday hours');
+  assert.equal(next.content.website.giftCards.buttonUrl, 'https://gift-store.example/gift-cards');
   const publishTree = repo.writes.filter(w => w.path === '/git/trees').at(-1);
   assert.deepEqual(publishTree.body.tree.map(e => e.path).sort(), ['.client-portal/published.json', 'src/content/menu.json', 'src/content/site.json']);
   assert.ok(repo.writes.filter(w => w.method === 'PATCH').every(w => w.body.force === false));

@@ -137,5 +137,12 @@
     "orderOnline": "https://www.toasttab.com/local/order/libelulamontclair",
     "instagram": "https://www.instagram.com/libelulamontclair/",
     "facebook": "https://www.facebook.com/LibelulaBakeryAndKitchen"
+  },
+  "giftCards": {
+    "eyebrow": "Digital gifts from Libélula",
+    "title": "Gift Cards",
+    "description": "Share a taste of Libélula with a digital gift card.",
+    "buttonText": "Shop digital gift cards",
+    "buttonUrl": "https://libelulabakeryandkitchen.shop.securetree.com/"
   }
 }
