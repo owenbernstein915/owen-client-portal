@@ -121,7 +121,7 @@ The local test suite passed: original content validation; unsafe-link/empty-menu
 - Website menu changes do not synchronize prices or availability to Toast. Update Toast separately when those need to change.
 - Displayed business hours are editable. The existing `availableTimes()` function in `src/App.jsx` has hardcoded reservation-picker hours. A schedule change also needs an update to that function; the portal includes a reminder in the hours section. Toast continues to determine actual booking availability.
 - Existing Pages CMS editing can remain available. Pages CMS edits on `main` publish according to its existing workflow; the portal's draft/publish separation applies only to edits made through this portal. Avoid simultaneous editing in both systems. Stale portal drafts are blocked rather than silently overwriting newer work.
-- If a draft is stale, export it, review the changes with Owen, and reconcile it with current live content. The portal deliberately does not auto-merge conflicting business content.
+- When saving a stale draft, the portal merges edits that touch separate fields with the latest live content. If the draft and live site changed the same field, the portal stops the save, keeps the edits in the editor, and asks the client to export the draft and contact Owen for review.
 - Version history begins with the first portal publish; existing Git history remains available in GitHub.
 
 ## Add the next business

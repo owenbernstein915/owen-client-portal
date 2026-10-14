@@ -40,7 +40,18 @@ function fakeRepo({ autoconfirm = false, otpStatus = 200 } = {}) {
     if (path.startsWith('/git/refs/heads/')) { const branch = path.slice('/git/refs/heads/'.length); if (body.force || !commits.get(body.sha).parents.includes(refs.get(branch))) return output({}, 422); refs.set(branch, body.sha); return output({ object: { sha: body.sha } }); }
     throw new Error('Unexpected fake API route '+method+' '+path);
   }
-  return { fetcher, writes, otpCalls, refs, initialSha };
+  function advanceMain(content) {
+    const parentSha = refs.get('main');
+    const parent = commits.get(parentSha);
+    const nextTree = { ...trees.get(parent.tree.sha) };
+    for (const document of clients[0].schema) nextTree[document.path] = blob(JSON.stringify(content[document.name], null, 2) + '\n');
+    const treeSha = hash(nextTree); trees.set(treeSha, nextTree);
+    const sha = hash('external-'+sequence++);
+    commits.set(sha, { sha, tree: { sha: treeSha }, parents: [parentSha] });
+    refs.set('main', sha);
+    return sha;
+  }
+  return { fetcher, writes, otpCalls, refs, initialSha, advanceMain };
 }
 function request(action, options = {}) {
   const q = new URLSearchParams({ action, site: options.site || 'libelula' });
@@ -133,3 +144,72 @@ test('stale draft revisions are rejected without writes', async () => {
   assert.equal(repo.writes.length, writeCount);
   assert.equal((await handler(request('publish', { method: 'POST', body: { draftSha: 'a'.repeat(40) } }))).status, 409);
 });
+
+test('stale draft saves merge separate live changes and retain new photo uploads', async () => {
+  const repo = fakeRepo(); const handler = makeHandler({ env, fetcher: repo.fetcher });
+  const original = await (await handler(request('content'))).json();
+  const draftContent = structuredClone(original.content);
+  draftContent.website.announcement.text = 'Draft announcement';
+  const savedDraft = await handler(request('draft', { method: 'PUT', body: {
+    content: draftContent, uploads: [], draftSha: original.draftSha, baseMainSha: original.baseMainSha,
+  } }));
+  assert.equal(savedDraft.status, 200, await savedDraft.clone().text());
+  const draft = await savedDraft.json();
+
+  const liveContent = structuredClone(original.content);
+  liveContent.website.giftCards.buttonUrl = 'https://gift-store.example/current';
+  const newMainSha = repo.advanceMain(liveContent);
+
+  const photoPath = 'public/images/uploads/00000000-0000-0000-0000-000000000001.webp';
+  const webp = Buffer.alloc(12); webp.write('RIFF', 0); webp.write('WEBP', 8);
+  const edits = structuredClone(draftContent);
+  edits.website.hero.image = '/images/uploads/00000000-0000-0000-0000-000000000001.webp';
+  edits.website.announcement.text = 'Edited announcement';
+  const mergedSave = await handler(request('draft', { method: 'PUT', body: {
+    content: edits,
+    uploads: [{ path: photoPath, base64: webp.toString('base64') }],
+    draftSha: draft.draftSha,
+    baseMainSha: original.baseMainSha,
+  } }));
+  assert.equal(mergedSave.status, 200, await mergedSave.clone().text());
+  const merged = await mergedSave.json();
+  assert.equal(merged.stale, false);
+  assert.equal(merged.merged, true);
+  assert.equal(merged.content.website.announcement.text, 'Edited announcement');
+  assert.equal(merged.content.website.giftCards.buttonUrl, 'https://gift-store.example/current');
+  assert.equal(merged.content.website.hero.image, '/images/uploads/00000000-0000-0000-0000-000000000001.webp');
+  assert.equal(repo.refs.get('main'), newMainSha, 'saving a draft must not change the live branch');
+
+  const publish = await handler(request('publish', { method: 'POST', body: { draftSha: merged.draftSha } }));
+  assert.equal(publish.status, 200, await publish.clone().text());
+  const live = await (await handler(request('content'))).json();
+  assert.equal(live.hasDraft, false);
+  assert.equal(live.content.website.announcement.text, 'Edited announcement');
+  assert.equal(live.content.website.giftCards.buttonUrl, 'https://gift-store.example/current');
+  assert.equal(live.content.website.hero.image, '/images/uploads/00000000-0000-0000-0000-000000000001.webp');
+  const publishTree = repo.writes.filter(write => write.path === '/git/trees').at(-1);
+  assert.ok(publishTree.body.tree.some(entry => entry.path === photoPath), 'publishing should include the uploaded photo');
+});
+
+test('stale draft save stops when the same field changed in the draft and live site', async () => {
+  const repo = fakeRepo(); const handler = makeHandler({ env, fetcher: repo.fetcher });
+  const original = await (await handler(request('content'))).json();
+  const draftContent = structuredClone(original.content);
+  draftContent.website.announcement.text = 'Draft copy';
+  const saved = await handler(request('draft', { method: 'PUT', body: {
+    content: draftContent, uploads: [], draftSha: original.draftSha, baseMainSha: original.baseMainSha,
+  } }));
+  const draft = await saved.json();
+  const liveContent = structuredClone(original.content);
+  liveContent.website.announcement.text = 'Live copy';
+  repo.advanceMain(liveContent);
+
+  const writeCount = repo.writes.length;
+  const conflict = await handler(request('draft', { method: 'PUT', body: {
+    content: draftContent, uploads: [], draftSha: draft.draftSha, baseMainSha: original.baseMainSha,
+  } }));
+  assert.equal(conflict.status, 409);
+  assert.match((await conflict.json()).error, /website\.announcement\.text/);
+  assert.equal(repo.writes.length, writeCount, 'a conflicting rebase must not write to GitHub');
+});
+

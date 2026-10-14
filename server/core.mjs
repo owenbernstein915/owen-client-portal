@@ -12,6 +12,55 @@ const jsonText = value => JSON.stringify(value, null, 2) + '\n';
 const fingerprint = content => createHash('sha256').update(JSON.stringify(content)).digest('hex');
 const encPath = value => value.split('/').map(encodeURIComponent).join('/');
 const portalUrl = 'https://owenbclientdashboard.netlify.app/';
+const absent = Symbol('absent');
+const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const owns = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+
+function sameValue(a, b) {
+  if (a === absent || b === absent) return a === b;
+  if (Object.is(a, b)) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length &&
+      a.every((value, index) => sameValue(value, b[index]));
+  }
+  if (!isRecord(a) || !isRecord(b)) return false;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every(key => owns(b, key) && sameValue(a[key], b[key]));
+}
+
+function cloneValue(value) { return value === absent ? absent : structuredClone(value); }
+
+function mergeValue(base, draft, live, path, conflicts) {
+  if (sameValue(draft, base)) return cloneValue(live);
+  if (sameValue(live, base) || sameValue(draft, live)) return cloneValue(draft);
+  if (isRecord(base) && isRecord(draft) && isRecord(live)) {
+    const result = {};
+    const keys = new Set([...Object.keys(base), ...Object.keys(draft), ...Object.keys(live)]);
+    for (const key of keys) {
+      const value = mergeValue(
+        owns(base, key) ? base[key] : absent,
+        owns(draft, key) ? draft[key] : absent,
+        owns(live, key) ? live[key] : absent,
+        path ? `${path}.${key}` : key,
+        conflicts,
+      );
+      if (value !== absent) Object.defineProperty(result, key, { value, enumerable: true, configurable: true, writable: true });
+    }
+    return result;
+  }
+  if (Array.isArray(base) && Array.isArray(draft) && Array.isArray(live) &&
+      base.length === draft.length && base.length === live.length) {
+    return base.map((value, index) => mergeValue(value, draft[index], live[index], `${path}[${index}]`, conflicts));
+  }
+  conflicts.push(path || 'content');
+  return cloneValue(live);
+}
+
+export function mergeContent(base, draft, live) {
+  const conflicts = [];
+  const content = mergeValue(base, draft, live, '', conflicts);
+  return { content, conflicts: [...new Set(conflicts)] };
+}
 
 function approvedEmail(email, env) {
   if (typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
@@ -160,22 +209,55 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
   async function saveDraft(client, body) {
     validateContent(body.content, client);
     const current = await state(client);
-    if (body.draftSha !== current.draftSha || body.baseMainSha !== current.baseMainSha || current.stale) fail(409, 'The saved draft or live website has changed. Export your changes, then reload and review them with Owen.');
+    if (body.draftSha !== current.draftSha || body.baseMainSha !== current.baseMainSha) fail(409, 'The saved draft changed while you were editing. Your changes are still in this editor; reload and try again.');
     const uploads = body.uploads || [];
     if (!Array.isArray(uploads) || uploads.length > 8) fail(400, 'Save up to eight photos at a time.');
     uploads.forEach(u => validateUpload(u, client));
-    const baseSha = current.hasDraft ? current.draftSha : current.mainSha;
-    const baseCommit = await gh(client, `/git/commits/${baseSha}`);
-    const entries = docEntries(client, body.content);
-    const uploadPaths = [...current.uploads];
+    let content = body.content;
+    let treeBaseSha = current.hasDraft ? current.draftSha : current.mainSha;
+    let treeBaseCommit;
+    if (current.stale) {
+      const [baseContent, liveContent] = await Promise.all([
+        readContent(client, current.baseMainSha),
+        readContent(client, current.mainSha),
+      ]);
+      const merged = mergeContent(baseContent, body.content, liveContent);
+      if (merged.conflicts.length) {
+        const fields = merged.conflicts.slice(0, 6).join(', ');
+        fail(409, `Your draft overlaps newer live changes in ${fields}. Your edits are still in this editor. Export the draft and contact Owen to review these fields.`);
+      }
+      content = merged.content;
+      validateContent(content, client);
+      treeBaseSha = current.mainSha;
+      treeBaseCommit = await gh(client, `/git/commits/${treeBaseSha}`);
+      const latestMain = await ref(client, client.branch);
+      if (latestMain.object.sha !== current.mainSha) fail(409, 'The live website changed while saving. Your edits are still in this editor; save again to merge them.');
+    } else {
+      treeBaseCommit = await gh(client, `/git/commits/${treeBaseSha}`);
+    }
+    const entries = docEntries(client, content);
+    const uploadPaths = [...new Set(current.uploads || [])];
+    const uploadEntries = new Map();
+    if (current.stale) {
+      for (const path of uploadPaths) {
+        if (!path.startsWith(client.uploadPrefix) || path.includes('..')) fail(400, 'Invalid draft image path.');
+        const file = await gh(client, `/contents/${encPath(path)}?ref=${current.draftSha}`);
+        uploadEntries.set(path, { path, mode: '100644', type: 'blob', sha: file.sha });
+      }
+    }
     for (const upload of uploads) {
       const blob = await gh(client, '/git/blobs', 'POST', { content: upload.base64, encoding: 'base64' });
-      entries.push({ path: upload.path, mode: '100644', type: 'blob', sha: blob.sha });
+      uploadEntries.set(upload.path, { path: upload.path, mode: '100644', type: 'blob', sha: blob.sha });
       if (!uploadPaths.includes(upload.path)) uploadPaths.push(upload.path);
     }
-    entries.push({ path: manifestPath, mode: '100644', type: 'blob', content: jsonText({ version: 1, baseMainSha: current.baseMainSha, fingerprint: fingerprint(body.content), savedAt: new Date().toISOString(), uploads: uploadPaths }) });
-    const draftSha = await commit(client, baseCommit.tree.sha, current.draftSha || current.mainSha, entries, 'Save website draft', client.draftBranch, !current.draftSha);
-    return { draftSha, baseMainSha: current.baseMainSha, savedAt: new Date().toISOString(), hasDraft: true };
+    entries.push(...uploadEntries.values());
+    const savedAt = new Date().toISOString();
+    const baseMainSha = current.stale ? current.mainSha : current.baseMainSha;
+    entries.push({ path: manifestPath, mode: '100644', type: 'blob', content: jsonText({ version: 1, baseMainSha, fingerprint: fingerprint(content), savedAt, uploads: uploadPaths }) });
+    const draftSha = await commit(client, treeBaseCommit.tree.sha, current.draftSha || current.mainSha, entries,
+      current.stale ? 'Rebase website draft and save changes' : 'Save website draft', client.draftBranch, !current.draftSha);
+    const latestMain = await ref(client, client.branch);
+    return { draftSha, baseMainSha, savedAt, hasDraft: true, stale: latestMain.object.sha !== baseMainSha, content, uploads: uploadPaths, merged: current.stale };
   }
   async function publish(client, body) {
     const current = await state(client);
@@ -266,3 +348,4 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
     }
   };
 }
+

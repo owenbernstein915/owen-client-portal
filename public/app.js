@@ -267,7 +267,7 @@ function set(path, value) { let dest = S.content; for (const p of path.slice(0, 
 function dateText(value) { return value ? new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value)) : ''; }
 function updateControls() {
   const save = document.querySelector('#save'); const publish = document.querySelector('#publish');
-  if (save) { save.disabled = S.busy || !S.dirty || S.data.stale; save.textContent = S.busy ? 'Working…' : 'Save draft'; }
+  if (save) { save.disabled = S.busy || !S.dirty; save.textContent = S.busy ? 'Working…' : 'Save draft'; }
   if (publish) publish.disabled = S.busy || S.dirty || !S.data.hasDraft || S.data.stale;
   const caption = document.querySelector('#save-status');
   if (caption) caption.textContent = S.dirty ? 'Unsaved changes' : S.data.hasDraft ? `Draft saved${S.data.savedAt ? ' · ' + dateText(S.data.savedAt) : ''}` : 'No unpublished changes';
@@ -281,7 +281,10 @@ async function save() {
   try {
     const savedUploads = S.uploads.map(upload => upload.path);
     const result = await api('draft', { method: 'PUT', body: { content: S.content, uploads: S.uploads, draftSha: S.data.draftSha, baseMainSha: S.data.baseMainSha } });
-    Object.assign(S.data, result); S.data.uploads = [...new Set([...(S.data.uploads || []), ...savedUploads])]; S.dirty = false; S.uploads = []; toast('Draft saved. Your live website has not changed.');
+    Object.assign(S.data, result); S.data.uploads = [...new Set([...(result.uploads || S.data.uploads || []), ...savedUploads])];
+    if (result.content) S.content = structuredClone(result.content);
+    S.dirty = false; S.uploads = []; render();
+    toast(result.merged ? 'Draft saved with newer live changes included. Your live website has not changed.' : 'Draft saved. Your live website has not changed.');
   } catch (e) { toast(e.message, true); }
   finally { S.busy = false; document.querySelector('#editor').inert = false; updateControls(); }
 }
@@ -402,7 +405,7 @@ function render() {
       el('div', { class: 'topbar-actions' }, button(S.visual ? 'Close visual editor' : 'Visual editor', toggleVisualEditor, 'button' + (S.visual ? ' primary' : ' quiet'), { 'aria-expanded': String(S.visual) }),
         el('a', { id: 'live-link', class: 'button live-link', target: '_blank', rel: 'noopener noreferrer', hidden: true }, 'View live site', icon('arrow')))),
     el('div', { class: 'status-strip' }, el('span', { id: 'deploy-status' }, 'Checking build status…'), el('span', { class: 'muted' }, 'Only published changes appear on your website.')),
-    S.data.stale && el('div', { class: 'warning', role: 'alert' }, 'The live website changed after this draft began. Export this draft and contact Owen to reconcile the changes before publishing.'),
+    S.data.stale && el('div', { class: 'warning', role: 'alert' }, 'The live website changed after this draft began. Saving will merge your edits with newer live changes. If the same field changed in both, saving will stop and ask you to contact Owen.'),
     stage,
     tools, el('footer', { class: 'actionbar' }, el('div', {}, el('strong', { id: 'save-status' }), el('small', {}, 'Save a draft, then publish when you’re ready.')), el('div', { class: 'actions' }, button('Preview draft', previewDraft, 'button quiet'), button('Save draft', save, 'button', { id: 'save' }), button('Publish changes', publish, 'button primary', { id: 'publish' }))))));
   if (S.visual) {
@@ -507,3 +510,4 @@ async function start() {
   } catch { app.replaceChildren(el('main', { class: 'setup' }, branding(), el('h1', {}, 'Connection unavailable'), el('p', {}, 'The portal could not connect. Please try again.'), button('Try again', () => location.reload()))); }
 }
 start();
+
