@@ -324,13 +324,17 @@ async function refreshStatus() {
     const link = document.querySelector('#live-link'); if (link && /^https?:\/\//.test(result.url || '')) { link.href = result.url; link.hidden = false; }
   } catch { const node = document.querySelector('#deploy-status'); if (node) node.textContent = 'Build status unavailable'; }
 }
-async function previewDraft() {
-  try {
-    const result = await api('status', { query: { mode: 'draft' } });
-    if (result.url && /^https?:\/\//.test(result.url) && (!result.configured || (result.state === 'ready' && result.commit === S.data.draftSha))) {
-      const link = el('a', { href: result.url, target: '_blank', rel: 'noopener noreferrer' }); link.click();
-    } else toast(result.configured ? 'The draft preview is not ready yet. Ask Owen to enable the draft branch in Netlify, or wait for its build.' : 'Draft preview is not connected yet. Owen can enable it in the portal setup.', true);
-  } catch (e) { toast(e.message, true); }
+function previewDraft() {
+  if (!S.visual) {
+    toggleVisualEditor();
+    if (!S.visual) return;
+  } else if (S.visualFieldsOpen) {
+    S.visualFieldsOpen = false;
+    render();
+  }
+  toast(S.dirty
+    ? 'Previewing your unsaved edits. Only you can see them here.'
+    : 'Previewing your saved draft. The live website is unchanged.');
 }
 async function history() {
   try {
