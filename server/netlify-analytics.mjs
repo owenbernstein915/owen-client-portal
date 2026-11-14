@@ -10,7 +10,7 @@ const minute = 60000;
 const validNumber = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
 export function makeNetlifyAnalytics({ env, external, fail, now = Date.now }) {
-  return async function netlifyAnalytics(client, range) {
+  return async function netlifyAnalytics(client, range, { diagnostics = false } = {}) {
     if (!Object.hasOwn(analyticsRanges, range)) fail(400, 'Choose Last Hour, Last 24 Hours, or Last 7 Days.');
     const siteId = env[client.netlifySiteIdEnv];
     if (!siteId || !env.NETLIFY_API_TOKEN) fail(503, 'The Netlify analytics connection needs to be configured by Owen.');
@@ -23,8 +23,7 @@ export function makeNetlifyAnalytics({ env, external, fail, now = Date.now }) {
     const invalid = () => fail(503, 'Netlify returned an incomplete analytics report. Please refresh; no estimated counts are shown.');
 
     async function query(type, queries) {
-      // Match the official client's one-query-per-request contract. Some
-      // Netlify endpoints reject a multi-query payload even though it is an array.
+      // Match the official client's one-query-per-request contract.
       if (queries.length > 1) {
         const parts = await Promise.all(queries.map(item => query(type, [item])));
         return { data: parts.flatMap(part => part.data), meta: { responses: parts.flatMap(part => part.meta.responses) } };
@@ -36,7 +35,15 @@ export function makeNetlifyAnalytics({ env, external, fail, now = Date.now }) {
         headers: { authorization: `Bearer ${env.NETLIFY_API_TOKEN}`, 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ data: [{ attributes: { queries } }] }),
       });
-      if (!response.ok) fail(503, `Netlify analytics is temporarily unavailable (HTTP ${response.status}). Please refresh or contact Owen.`);
+      if (!response.ok) {
+        let detail = '';
+        if (diagnostics) {
+          const error = await response.json().catch(() => ({}));
+          const message = error.msg || error.message || error.error;
+          if (typeof message === 'string') detail = ` ${message.replaceAll(env.NETLIFY_API_TOKEN, '[redacted]').slice(0,200)}`;
+        }
+        fail(503, `Netlify analytics is temporarily unavailable (HTTP ${response.status}).${detail} Please refresh or contact Owen.`);
+      }
       let data;
       try { data = await response.json(); } catch { invalid(); }
       if (!Array.isArray(data?.data) || !Array.isArray(data?.meta?.responses) || data.meta.responses.length !== queries.length) invalid();
