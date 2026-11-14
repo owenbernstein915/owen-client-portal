@@ -33,7 +33,8 @@ function setup({ status = 200, malformed = false, limited = false, retention = f
       } else attributes={items:[{key:query.name==='urls'?'https://mediaremixed.com/':query.name==='referrers'?'example.com':'US',count:total}]};
       return {type:`${query.name}_response`,attributes};
     });
-    return Response.json({data,meta:{responses:queries.map(()=>({from:retention && from===end-10080*60000?from+5000:from,to,limited,...(type==='timeseries'?{interval:60000}:{})}))}});
+    const clamped = retention && (from===end-10080*60000 || (retention==='advancing' && from===end-10079*60000));
+    return Response.json({data,meta:{responses:queries.map(()=>({from:clamped?from+5000:from,to,limited,...(type==='timeseries'?{interval:60000}:{})}))}});
   } });
   return { handler, calls };
 }
@@ -87,6 +88,17 @@ test('retention clamping re-queries every metric for one consistent available wi
   const data=await response.json(); assert.equal(data.coverageLimited,true);
   assert.equal(Date.parse(data.from),end-10079*60000); assert.equal(data.pageViews,28);
   assert.equal(calls.filter(c=>c.url.includes('api.netlify')).length,14);
+});
+
+test('seven-day retention can advance across another minute while source queries complete',async()=>{
+  const {handler,calls}=setup({retention:'advancing'});
+  const response=await handler(request('media-remixed','jamie','&range=7d')); assert.equal(response.status,200);
+  const data=await response.json(); assert.equal(data.coverageLimited,true);
+  assert.equal(Date.parse(data.from),end-10078*60000);
+  assert.equal(data.pageViews,data.buckets.reduce((total,row)=>total+row.views,0));
+  const sourceCalls=calls.filter(c=>c.url.includes('api.netlify'));
+  assert.equal(sourceCalls.length,21);
+  assert.ok(sourceCalls.slice(-7).every(c=>Number(new URL(c.url).searchParams.get('from_ts'))===Date.parse(data.from)));
 });
 
 test('invalid ranges, upstream failures and incomplete source data never turn into misleading zero traffic',async()=>{
