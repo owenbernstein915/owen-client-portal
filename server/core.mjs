@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { clients } from './clients.mjs';
+import { makeDatabaseContentHandler } from './database-content.mjs';
 
 export class PortalError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -276,7 +277,7 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
     return { mainSha, message: 'Changes sent for publishing. The website updates when its build finishes.' };
   }
   async function netlify(client, mode) {
-    const siteId = client.publishingSiteId || env[client.netlifySiteIdEnv];
+    const siteId = env[client.netlifySiteIdEnv];
     if (!siteId || !env.NETLIFY_API_TOKEN) return { configured: false, url: mode === 'draft' ? client.draftUrl : client.liveUrl };
     const headers = { authorization: `Bearer ${env.NETLIFY_API_TOKEN}` };
     const response = await external(`https://api.netlify.com/api/v1/sites/${encodeURIComponent(siteId)}/deploys?per_page=30`, { headers });
@@ -285,15 +286,20 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
     const desiredBranch = mode === 'draft' ? client.draftBranch : client.branch;
     const deploy = deploys.find(d => d.branch === desiredBranch && (mode === 'draft' ? d.context === 'branch-deploy' : d.context === 'production'));
     if (!deploy) return { configured: true, state: 'waiting', url: mode === 'draft' ? client.draftUrl : client.liveUrl };
-    return { configured: true, state: deploy.state, commit: deploy.commit_ref, url: mode === 'draft' ? (deploy.deploy_ssl_url || deploy.deploy_url) : client.publishingSiteId ? client.liveUrl : (deploy.ssl_url || deploy.url), updatedAt: deploy.updated_at };
+    return { configured: true, state: deploy.state, commit: deploy.commit_ref, url: mode === 'draft' ? (deploy.deploy_ssl_url || deploy.deploy_url) : (deploy.ssl_url || deploy.url), updatedAt: deploy.updated_at };
   }
 
+  const databaseContent = makeDatabaseContentHandler({env,external,respond,fail,validateContent,validateUpload,mergeContent});
   return async function handler(request) {
     try {
       const url = new URL(request.url); const action = url.searchParams.get('action') || 'config';
-      const methods = { config: 'GET', signup: 'POST', sites: 'GET', analytics: 'GET', content: 'GET', draft: 'PUT', publish: 'POST', status: 'GET', image: 'GET', history: 'GET', version: 'GET' };
+      const methods = { config: 'GET', signup: 'POST', sites: 'GET', analytics: 'GET', content: 'GET', draft: 'PUT', publish: 'POST', status: 'GET', image: 'GET', history: 'GET', version: 'GET', 'public-content': 'GET', 'public-image': 'GET' };
       if (!methods[action]) fail(404, 'Unknown action.');
       if (request.method !== methods[action]) fail(405, 'Method not allowed.');
+      if (action === 'public-content' || action === 'public-image') {
+        const client=clients.find(item=>item.id==='media-remixed');
+        return await databaseContent({action,client,url,auth:''});
+      }
       if (action === 'config') return respond({ configured: !!(env.SUPABASE_URL && env.SUPABASE_PUBLISHABLE_KEY && env.GITHUB_TOKEN && (env.PORTAL_ACCESS_JSON || env.PORTAL_SIGNUP_ALLOWLIST_JSON)), signupEnabled: !!env.PORTAL_SIGNUP_ALLOWLIST_JSON, supabaseUrl: env.SUPABASE_URL || '', supabaseKey: env.SUPABASE_PUBLISHABLE_KEY || '' });
       if (action === 'signup') {
         if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY || !env.PORTAL_SIGNUP_ALLOWLIST_JSON) fail(503, 'Client signup is not configured yet.');
@@ -333,6 +339,10 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
         return respond(await result.json());
       }
       if (client.editable === false || access.role === 'viewer') fail(403, 'This account has analytics access. Contact Owen for website changes.');
+      if(client.contentBackend==='supabase') {
+        const result=await databaseContent({action,client,auth,url,body:['draft','publish'].includes(action)?await readBody(request):undefined});
+        if(result) return result;
+      }
       if (action === 'content') return respond({ ...await state(client), schema: client.schema });
       if (action === 'draft') return respond(await saveDraft(client, await readBody(request)));
       if (action === 'publish') return respond(await publish(client, await readBody(request)));

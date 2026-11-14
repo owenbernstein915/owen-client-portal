@@ -26,7 +26,7 @@
     if (typeof path !== 'string' || !/^\/images\/[a-zA-Z0-9_./-]+$/.test(path) || path.includes('..')) return '';
     const override = imageOverrides[path];
     if (preview && typeof override === 'string' && override.length <= 2100000 && /^data:image\/webp;base64,[A-Za-z0-9+/]+=*$/.test(override)) return override;
-    return PORTAL + path;
+    return /^\/images\/uploads\//.test(path) ? PORTAL + '/api/portal?action=public-image&path=' + encodeURIComponent(path) : PORTAL + path;
   }
   function bind(el, path) {
     if (el && preview) {
@@ -157,7 +157,7 @@
     });
     window.parent.postMessage({type:'owen-portal:ready',siteId:SITE}, PORTAL);
   }
-  fetch(PORTAL + '/media-remixed-content.json', {cache:'no-store', credentials:'omit'})
+  fetch(PORTAL + '/api/portal?action=public-content', {cache:'no-store', credentials:'omit'})
     .then(response => { if (!response.ok) throw new Error('Content unavailable'); return response.json(); })
     .then(data => { if (!draftReceived) apply(data); })
     .catch(() => { /* Keep the complete static website if the content service is temporarily unavailable. */ });
