@@ -1,4 +1,4 @@
-(() => {
+function collectTraffic(config) {
   if (window.__owenAnalytics || navigator.doNotTrack === '1' || navigator.globalPrivacyControl || location.search.includes('portalEditor')) return;
   const sites = {
     'libelulamontclair.com': 'libelula', 'www.libelulamontclair.com': 'libelula',
@@ -12,12 +12,15 @@
     if (document.visibilityState !== 'visible') return;
     document.removeEventListener('visibilitychange', send);
     let referrer = ''; try { referrer = document.referrer ? new URL(document.referrer).origin : ''; } catch {}
-    fetch('https://iysyvualdvgpyoszqkdi.supabase.co/functions/v1/portal-collect', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: 'sb_publishable_hhFNkZSkU4iiq3XdB_5Ecw_bUjGKSuI' },
+    fetch(config.endpoint, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: config.key },
       body: JSON.stringify({ site, id: crypto.randomUUID(), path: location.pathname, referrer }),
       keepalive: true, credentials: 'omit', referrerPolicy: 'no-referrer'
     }).catch(() => {});
   };
   if (document.visibilityState === 'visible') send(); else document.addEventListener('visibilitychange', send);
-})();
+}
 
+export function trackerSource({ url, key }) {
+  return `(${collectTraffic.toString()})(${JSON.stringify({ endpoint: `${url.replace(/\/$/, '')}/functions/v1/portal-collect`, key })});`;
+}
