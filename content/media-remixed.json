@@ -74,7 +74,8 @@
         "image_alt": "",
         "available": true
       }
-    ]
+    ],
+    "youtube_sync": true
   },
   "newsletter": {
     "eyebrow": "THE NEWSLETTER",
@@ -93,8 +94,8 @@
     "instagram_url": "https://www.instagram.com/mediaremixed/?utm_source=ig_web_button_share_sheet",
     "linkedin_url": "https://www.linkedin.com/company/media-remixed/",
     "tiktok_url": "https://www.tiktok.com/@mediaremixed",
-    "spotify_url": "",
-    "apple_podcasts_url": "",
+    "spotify_url": "https://open.spotify.com/show/3LhExVjNbOc7G14n2vz3CK?si=gWIQk_kPSp6E-ONlI3MhxA&utm_source=copy-link",
+    "apple_podcasts_url": "https://podcasts.apple.com/us/podcast/media-remixed/id6834893021",
     "substack_url": "https://mediaremixed.substack.com/"
   }
 }

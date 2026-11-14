@@ -19,6 +19,7 @@ function setup(){
    if(url.endsWith('/rpc/portal_web_publish')){live=state.content;state={...state,hasDraft:false,mainSha:state.draftSha,baseMainSha:state.draftSha};return Response.json({mainSha:state.mainSha,message:'Your changes are live.'});}
    if(parsed.pathname==='/rest/v1/portal_web_published')return Response.json([{content:live,revision:state.mainSha,updated_at:'2026-11-14'}]);
    if(parsed.pathname==='/rest/v1/portal_web_assets')return Response.json([]);
+   if(parsed.pathname==='/functions/v1/media-remixed-youtube')return Response.json({items:[],stale:false});
    throw new Error('Unexpected upstream request: '+url);
  }});
  return {handler,calls};

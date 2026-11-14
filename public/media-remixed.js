@@ -73,7 +73,9 @@
       grid.replaceChildren(...(home ? entries.slice(0, 3) : entries).map(({item, index}) => {
         const card = document.createElement('article'); card.className = 'episode-card';
         const art = document.createElement('div'); art.className = 'episode-art';
-        const src = imageUrl(item.image);
+        let youtubeId='';
+        try { const url=new URL(item.url); const id=url.hostname==='youtu.be' ? url.pathname.slice(1) : ['youtube.com','www.youtube.com','m.youtube.com'].includes(url.hostname) ? url.searchParams.get('v') || url.pathname.match(/^\/(?:shorts|live)\/([\w-]{11})$/)?.[1] : ''; if(url.protocol==='https:' && /^[\w-]{11}$/.test(id||'')) youtubeId=id; } catch { /* Manual or coming-soon episode. */ }
+        const src = imageUrl(item.image) || (youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg` : '');
         if (src) {
           const img = document.createElement('img'); img.src = src; img.alt = item.image_alt || item.title; img.loading = 'lazy';
           Object.assign(img.style, {width:'100%', height:'100%', objectFit:'cover', position:'absolute', inset:'0', filter:'none'}); art.append(img);
@@ -87,7 +89,7 @@
         const description = document.createElement('p'); description.textContent = item.description; bind(description, ['episodes', 'items', index, 'description']);
         card.append(art, heading, description);
         const url = safeUrl(item.url);
-        if (url) { const link = document.createElement('a'); link.className = 'text-link'; link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Listen / watch '; if (arrow) link.append(arrow.cloneNode(true)); bind(link, ['episodes', 'items', index, 'url']); card.append(link); }
+        if (url) { const link = document.createElement('a'); link.className = 'text-link'; link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = youtubeId ? 'Watch on YouTube ' : 'Listen / watch '; if (arrow) link.append(arrow.cloneNode(true)); bind(link, ['episodes', 'items', index, 'url']); card.append(link); }
         return card;
       }));
     });

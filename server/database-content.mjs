@@ -1,6 +1,24 @@
+import { mergeYouTubeEpisodes } from '../public/media-episodes.mjs';
+
 export function makeDatabaseContentHandler({ env, external, respond, fail, validateContent, validateUpload, mergeContent }) {
   const imagePattern = /^\/images\/uploads\/[a-f0-9-]{36}\.webp$/;
   const revisionPattern = /^[a-f0-9]{40}$/;
+  async function youtube() {
+    try {
+      const result=await external(env.SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/media-remixed-youtube',{headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY}});
+      if(!result.ok) throw new Error('Unavailable');
+      const feed=await result.json();
+      if(!Array.isArray(feed.items)) throw new Error('Invalid response');
+      return feed;
+    } catch { return {items:[],unavailable:true,stale:true}; }
+  }
+  function includeYouTube(content,feed) {
+    const copy=structuredClone(content);
+    const episodes=copy.website.episodes;
+    episodes.youtube_sync=episodes.youtube_sync!==false;
+    episodes.items=mergeYouTubeEpisodes(episodes,feed.items);
+    return copy;
+  }
   async function db(path, auth, method = 'GET', body) {
     const response = await external(env.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/' + path, {
       method, headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY, ...(auth ? { authorization: auth } : {}), 'content-type': 'application/json' },
@@ -33,7 +51,8 @@ export function makeDatabaseContentHandler({ env, external, respond, fail, valid
     if (action === 'public-content') {
       const row = await published(client, '');
       if (!row) fail(404,'Website content not found.');
-      return new Response(JSON.stringify(row.content.website),{headers:{'content-type':'application/json','cache-control':'no-store','access-control-allow-origin':'*','x-content-type-options':'nosniff'}});
+      const content=row.content.website.episodes.youtube_sync===false ? row.content : includeYouTube(row.content,await youtube());
+      return new Response(JSON.stringify(content.website),{headers:{'content-type':'application/json','cache-control':'no-store','access-control-allow-origin':'*','x-content-type-options':'nosniff'}});
     }
     if (action === 'public-image' || action === 'image' && imagePattern.test(url.searchParams.get('path') || '')) {
       const path = url.searchParams.get('path') || '';
@@ -48,7 +67,15 @@ export function makeDatabaseContentHandler({ env, external, respond, fail, valid
       if(!response.ok) fail(404,'Photo unavailable.');
       return new Response(await response.arrayBuffer(),{headers:{'content-type':'image/jpeg','cache-control':'private, max-age=300','x-content-type-options':'nosniff'}});
     }
-    if (action === 'content') return respond({...await state(client,auth),schema:client.schema});
+    if (action === 'content') {
+      const [saved,feed]=await Promise.all([state(client,auth),youtube()]);
+      return respond({...saved,content:includeYouTube(saved.content,feed),youtube:feed,schema:client.schema});
+    }
+    if (action === 'youtube') {
+      const feed=await youtube();
+      if(feed.unavailable) fail(503,'YouTube is temporarily unavailable. Try again shortly.');
+      return respond(feed);
+    }
     if (action === 'draft') {
       validateContent(body.content,client);
       const current = await state(client,auth);

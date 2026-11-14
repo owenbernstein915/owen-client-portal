@@ -10,6 +10,7 @@ function setup(rpcStatus = 200) {
     calls.push({ url, ...init });
     if (url.endsWith('/auth/v1/user')) { const id = init.headers.authorization.split(' ')[1]; return Response.json({ id, email: `${id}@example.com`, email_confirmed_at: '2026-11-14' }); }
     if (url.endsWith('/rest/v1/rpc/portal_analytics')) return Response.json({ siteId: JSON.parse(init.body).p_site, pageViews: 12 }, { status: rpcStatus });
+    if(url.includes('/rest/v1/portal_analytics_imports?'))return Response.json([{source:'netlify',data:{pageViews:300}}]);
     throw new Error('Unexpected upstream request');
   } });
   return { handler, calls };
@@ -21,7 +22,8 @@ test('analytics enforces user/site ownership before querying data and forwards t
   assert.equal((await handler(request('media-remixed','jennifer'))).status, 403);
   assert.equal(calls.filter(c=>c.url.includes('/rpc/')).length, 0);
   const response = await handler(request()); assert.equal(response.status,200); assert.equal((await response.json()).siteId,'media-remixed');
-  const rpc = calls.at(-1); assert.equal(rpc.headers.authorization,'Bearer jamie'); assert.deepEqual(JSON.parse(rpc.body),{p_site:'media-remixed',p_days:30});
+  const rpc = calls.find(c=>c.url.endsWith('/rpc/portal_analytics')); assert.equal(rpc.headers.authorization,'Bearer jamie'); assert.deepEqual(JSON.parse(rpc.body),{p_site:'media-remixed',p_days:30});
+  const imported=calls.at(-1);assert.equal(imported.headers.authorization,'Bearer jamie');assert.ok(imported.url.includes('site_id=eq.media-remixed'));
 });
 test('analytics range validation and upstream failures do not produce misleading zero traffic',async()=>{
   const {handler,calls}=setup(500);

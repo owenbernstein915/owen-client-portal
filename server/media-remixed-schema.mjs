@@ -30,6 +30,7 @@ export default [{
       required('show_description', 'About the show', 'text'),
     ]),
     object('episodes', 'Episodes', [
+      field('youtube_sync', 'Automatically show new YouTube uploads', 'boolean'),
       required('title', 'Section heading'),
       required('description', 'Episodes page introduction', 'text'),
       { name: 'items', label: 'Episodes', type: 'object', list: { min: 0, max: 100 }, fields: [

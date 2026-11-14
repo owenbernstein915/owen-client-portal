@@ -293,7 +293,7 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
   return async function handler(request) {
     try {
       const url = new URL(request.url); const action = url.searchParams.get('action') || 'config';
-      const methods = { config: 'GET', signup: 'POST', sites: 'GET', analytics: 'GET', content: 'GET', draft: 'PUT', publish: 'POST', status: 'GET', image: 'GET', history: 'GET', version: 'GET', 'public-content': 'GET', 'public-image': 'GET' };
+      const methods = { config: 'GET', signup: 'POST', sites: 'GET', analytics: 'GET', content: 'GET', youtube: 'GET', draft: 'PUT', publish: 'POST', status: 'GET', image: 'GET', history: 'GET', version: 'GET', 'public-content': 'GET', 'public-image': 'GET' };
       if (!methods[action]) fail(404, 'Unknown action.');
       if (request.method !== methods[action]) fail(405, 'Method not allowed.');
       if (action === 'public-content' || action === 'public-image') {
@@ -336,7 +336,13 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
           body: JSON.stringify({ p_site: client.id, p_days: days }),
         });
         if (!result.ok) fail(503, 'Analytics could not be loaded. Please try again or contact Owen.');
-        return respond(await result.json());
+        const data=await result.json();
+        try {
+          const imported=await external(`${env.SUPABASE_URL.replace(/\/$/,'')}/rest/v1/portal_analytics_imports?site_id=eq.${client.id}&select=source,from_date,to_date,imported_at,data&order=imported_at.desc&limit=1`,{headers:{authorization:auth,apikey:env.SUPABASE_PUBLISHABLE_KEY}});
+          if(!imported.ok) throw new Error('History unavailable');
+          data.historical=(await imported.json())[0]||null;
+        } catch { data.historyError='Imported history is temporarily unavailable.'; }
+        return respond(data);
       }
       if (client.editable === false || access.role === 'viewer') fail(403, 'This account has analytics access. Contact Owen for website changes.');
       if(client.contentBackend==='supabase') {

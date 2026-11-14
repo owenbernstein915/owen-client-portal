@@ -1,5 +1,6 @@
 import { createVisualRefreshUrl } from './visual-preview.mjs';
 import { analyticsPanel } from './analytics.mjs';
+import { mergeYouTubeEpisodes, youtubeVideoId } from './media-episodes.mjs';
 
 const app = document.querySelector('#app');
 const notice = document.querySelector('#notice');
@@ -285,6 +286,19 @@ async function loadContent() {
   S.section = doc.fields.find(f => f.name === S.section)?.name || doc.fields[0]?.name;
   S.view = 'editor'; render(); refreshStatus();
 }
+async function syncYouTube() {
+  try {
+    const feed=await api('youtube');
+    S.data.youtube=feed;
+    const episodes=S.content.website.episodes;
+    const items=mergeYouTubeEpisodes({...episodes,youtube_sync:true},feed.items);
+    if(JSON.stringify(items)!==JSON.stringify(episodes.items)) {
+      set(['website','episodes','items'],items);
+      toast('YouTube episodes added to your draft. Edit the text, then save and publish.');
+    } else toast(feed.items.length ? 'Your episodes are up to date.' : 'YouTube is connected. New public videos will appear automatically after they are uploaded.');
+    render();
+  } catch(error) { toast(error.message,true); }
+}
 function dirty() { S.dirty = true; updateControls(); syncVisualContent(); }
 function get(path) { return path.reduce((a, p) => a?.[p], S.content); }
 function set(path, value) { let dest = S.content; for (const p of path.slice(0, -1)) dest = dest[p]; dest[path.at(-1)] = value; dirty(); }
@@ -421,6 +435,10 @@ function render() {
     el('div', { class: 'sidebar-bottom' }, button('Version history', history, 'nav-button'), el('div', { class: 'account' }, el('span', { class: 'avatar' }, S.email[0].toUpperCase()), el('div', {}, el('strong', {}, S.role === 'admin' ? 'Administrator' : 'Website editor'), el('small', {}, S.email))), button('Sign out', signOut, 'text-button')));
   const sections = !doc.list && el('div', { class: 'section-picker' }, el('label', { for: 'section' }, 'Editing section'), el('select', { id: 'section', onChange: e => { S.section = e.target.value; render(); } }, ...doc.fields.map(f => el('option', { value: f.name, selected: selected.name === f.name }, f.label))));
   const editor = el('form', { id: 'editor', onSubmit: e => e.preventDefault() },
+    S.client.id==='media-remixed' && selected.name==='episodes' && el('div',{class:'editing-note'},
+      el('p',{},'New public uploads from Media Remixed on YouTube appear automatically. You can edit their website titles and descriptions, hide episodes, reorder them, or add an episode manually. Changes here do not change YouTube.'),
+      el('p',{},S.data.youtube?.unavailable ? 'YouTube could not be checked. Saved episodes are still available.' : S.data.youtube?.items?.length ? `${S.data.youtube.items.length} YouTube videos connected${S.data.youtube.stale ? ' · using the last saved update' : ''}.` : 'YouTube is connected. No public videos have been uploaded yet.'),
+      button('Check YouTube for new episodes',syncYouTube,'button',{disabled:S.busy})),
     doc.list && el('p', { class: 'editing-note' }, 'Menu changes update this website. Update Toast separately for online ordering prices and availability.'),
     selected.name === 'visit' && el('p', { class: 'editing-note' }, 'These hours appear on your website. Ask Owen to update the reservation time picker when your schedule changes.'),
     doc.list ? field(doc, [doc.name], true) : field(selected, [doc.name, selected.name], true));
@@ -463,10 +481,12 @@ function field(f, path, root = false) {
     list.forEach((item, index) => {
       const title = item.name || item.label || item.title || item.day || item.alt || item.source || `${label} ${index + 1}`;
       const min = f.name === 'menus' || f.name === 'sections' ? 1 : f.list.min || 0;
-      const controls = el('div', { class: 'item-actions' }, button('Move up', () => { const copy = [...list]; [copy[index - 1], copy[index]] = [copy[index], copy[index - 1]]; set(path, copy); render(); }, 'text-button', { disabled: index === 0 }), button('Move down', () => { const copy = [...list]; [copy[index + 1], copy[index]] = [copy[index], copy[index + 1]]; set(path, copy); render(); }, 'text-button', { disabled: index === list.length - 1 }), button('Remove', () => { if (confirm(`Remove “${title}” from this draft?`)) { set(path, list.filter((_, i) => i !== index)); render(); } }, 'text-button danger', { disabled: list.length <= min }));
+      const syncedEpisode=S.client.id==='media-remixed' && path.includes('episodes') && S.content.website.episodes.youtube_sync!==false && youtubeVideoId(item.url);
+      const remove=syncedEpisode ? button(item.available===false ? 'Show episode' : 'Hide episode',()=>{set([...path,index,'available'],item.available===false);render();},'text-button') : button('Remove', () => { if (confirm(`Remove “${title}” from this draft?`)) { set(path, list.filter((_, i) => i !== index)); render(); } }, 'text-button danger', { disabled: list.length <= min });
+      const controls = el('div', { class: 'item-actions' }, button('Move up', () => { const copy = [...list]; [copy[index - 1], copy[index]] = [copy[index], copy[index - 1]]; set(path, copy); render(); }, 'text-button', { disabled: index === 0 }), button('Move down', () => { const copy = [...list]; [copy[index + 1], copy[index]] = [copy[index], copy[index + 1]]; set(path, copy); render(); }, 'text-button', { disabled: index === list.length - 1 }), remove);
       area.append(el('details', { class: 'list-item', open: list.length === 1 }, el('summary', {}, el('span', { class: 'item-number' }, String(index + 1).padStart(2, '0')), el('span', {}, title), item.available === false && el('small', { class: 'muted' }, 'Hidden')), el('div', { class: 'list-item-body' }, field({ ...f, list: false }, [...path, index], true), controls)));
     });
-    area.append(button(`+ Add ${f.name === 'menus' ? 'menu' : f.name === 'items' ? 'item' : f.name === 'sections' ? 'category' : 'entry'}`, () => { set(path, [...list, defaultValue({ ...f, list: false })]); render(); const all = document.querySelectorAll('.list-item'); all[all.length - 1]?.setAttribute('open', ''); }, 'button add-button', { disabled: list.length >= (f.list.max || 500) }));
+    area.append(button(`+ Add ${S.client.id==='media-remixed' && path.includes('episodes') ? 'episode' : f.name === 'menus' ? 'menu' : f.name === 'items' ? 'item' : f.name === 'sections' ? 'category' : 'entry'}`, () => { set(path, [...list, defaultValue({ ...f, list: false })]); render(); const all = document.querySelectorAll('.list-item'); all[all.length - 1]?.setAttribute('open', ''); }, 'button add-button', { disabled: list.length >= (f.list.max || 500) }));
     return area;
   }
   if (f.type === 'object' || f.type === 'file') return el('div', { class: 'field-grid' }, ...f.fields.filter(child => !child.readonly).map(child => field(child, [...path, child.name])));

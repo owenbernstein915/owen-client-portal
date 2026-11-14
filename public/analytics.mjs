@@ -1,3 +1,5 @@
+import { historicalAnalyticsPanel } from './analytics-history.mjs';
+
 export function analyticsPanel({ el, button, data, loading, error, days, changeDays, refresh, siteName, liveUrl }) {
   const number = n => new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(n || 0);
   const date = d => new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(d));
@@ -7,13 +9,16 @@ export function analyticsPanel({ el, button, data, loading, error, days, changeD
     el('header', { class: 'topbar' }, el('div', {}, el('p', { class: 'eyebrow' }, siteName), el('h1', {}, 'Website analytics')),
       el('a', { class: 'button', href: liveUrl, target: '_blank', rel: 'noopener noreferrer' }, 'View live site')),
     el('div', { class: 'analytics-controls' }, el('p', { class: 'muted' }, 'See how people find and explore your website.'),
-      el('div', { class: 'analytics-range' }, el('label', { for: 'analytics-days' }, 'Date range'),
+      el('div', { class: 'analytics-range' }, el('label', { for: 'analytics-days' }, 'Live tracking range'),
         el('select', { id: 'analytics-days', disabled: loading, onChange: e => changeDays(Number(e.target.value)) }, ...[7,30,90].map(n => el('option', { value: n, selected: n === days }, `Last ${n} days`))),
         button(loading ? 'Refreshing…' : 'Refresh', refresh, 'button', { disabled: loading }))),
     el('div', { 'aria-live': 'polite', role: 'status', class: 'analytics-update' }, loading ? 'Loading your website’s traffic…' : data ? `Updated ${new Date(data.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · Daily totals use UTC` : ''),
   );
   if (error) { main.append(el('div', { class: 'warning', role: 'alert' }, error, button('Try again', refresh, 'button'))); return main; }
   if (!data) return main;
+  if(data.historical) main.append(historicalAnalyticsPanel({el,history:data.historical}));
+  if(data.historyError) main.append(el('p',{class:'warning',role:'alert'},data.historyError));
+  main.append(el('div',{class:'analytics-history-heading'},el('div',{},el('p',{class:'eyebrow'},'LIVE TRACKING'),el('h2',{},'Current website activity')),el('p',{class:'muted'},`Since ${date(data.trackingStartedAt)}`)));
   if (!data.pageViews) main.append(el('section', { class: 'analytics-empty' }, el('h2', {}, 'Ready for your next visitor.'), el('p', {}, `Tracking started ${date(data.trackingStartedAt)}. Your first page views will appear here automatically. Traffic from before tracking was installed isn’t available.`)));
   main.append(el('div', { class: 'analytics-metrics' },
     metric('Page views', number(data.pageViews), 'Every recorded page load'),
