@@ -20,7 +20,6 @@ export function makeNetlifyAnalytics({ env, external, fail, now = Date.now }) {
     const to = Math.floor(now() / minute) * minute;
     const requestedFrom = to - config.minutes * minute;
     let from = requestedFrom;
-    let analyticsConnectionCheck;
     const invalid = () => fail(503, 'Netlify returned an incomplete analytics report. Please refresh; no estimated counts are shown.');
 
     async function query(type, queries) {
@@ -42,16 +41,7 @@ export function makeNetlifyAnalytics({ env, external, fail, now = Date.now }) {
           const error = await response.json().catch(() => ({}));
           const message = error.msg || error.message || error.error;
           if (typeof message === 'string') detail = ` ${message.replaceAll(env.NETLIFY_API_TOKEN, '[redacted]').slice(0,200)}`;
-          if (response.status === 401) {
-            analyticsConnectionCheck ||= (async () => {
-              const params = new URLSearchParams({from:String(from),to:String(to-1),timezone:'+0000',resolution:'hour'});
-              const check = await external(`https://analytics.services.netlify.com/v2/${encodeURIComponent(siteId)}/pageviews?${params}`,{headers:{authorization:`Bearer ${env.NETLIFY_API_TOKEN}`}});
-              const result = await check.json().catch(()=>({}));
-              const points = Array.isArray(result.data) ? result.data.filter(row=>Array.isArray(row)&&row.length===2&&row.every(Number.isFinite)) : [];
-              return ` Web Analytics connection: HTTP ${check.status}; ${points.length} numeric data points; ${points.reduce((sum,row)=>sum+row[1],0)} page views.`;
-            })();
-            detail += await analyticsConnectionCheck;
-          }
+
         }
         fail(503, `Netlify analytics is temporarily unavailable (HTTP ${response.status}).${detail} Please refresh or contact Owen.`);
       }

@@ -94,7 +94,7 @@ test('invalid ranges, upstream failures and incomplete source data never turn in
   for(const suffix of ['&range=30d','&range=7','&range=__proto__','&days=30']) assert.equal((await handler(request('media-remixed','jamie',suffix))).status,400);
   assert.equal(calls.filter(c=>c.url.includes('api.netlify')).length,0);
   for(const options of [{status:403},{status:500},{malformed:true},{limited:true}]) {
-    const result=await setup(options).handler(request()); assert.equal(result.status,503); const body=await result.json(); assert.ok(body.error); assert.equal(body.pageViews,undefined);
+    const result=await setup(options).handler(request()); assert.equal(result.status,503); const body=await result.json(); assert.ok(body.error); assert.equal(body.pageViews,undefined); assert.equal(body.historical.data.pageViews,300);
   }
   const result=await setup({historyStatus:500}).handler(request()); assert.equal(result.status,200); const data=await result.json(); assert.equal(data.pageViews,17); assert.ok(data.historyError);
 });

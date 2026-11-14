@@ -332,13 +332,18 @@ export function makeHandler({ env = process.env, fetcher = fetch, now = Date.now
       const client = clientFor(url.searchParams.get('site'), access);
       if (action === 'analytics') {
         if (url.searchParams.has('days')) fail(400, 'Choose Last Hour, Last 24 Hours, or Last 7 Days.');
-        const data = await netlifyAnalytics(client, url.searchParams.get('range') || '24h', { diagnostics: access.role === 'admin' });
+        let data;
+        try { data = await netlifyAnalytics(client, url.searchParams.get('range') || '24h', { diagnostics: access.role === 'admin' }); }
+        catch (error) {
+          if (error.status !== 503) throw error;
+          data = { error: error.message };
+        }
         try {
           const imported=await external(`${env.SUPABASE_URL.replace(/\/$/,'')}/rest/v1/portal_analytics_imports?site_id=eq.${client.id}&select=source,from_date,to_date,imported_at,data&order=imported_at.desc&limit=1`,{headers:{authorization:auth,apikey:env.SUPABASE_PUBLISHABLE_KEY}});
           if(!imported.ok) throw new Error('History unavailable');
           data.historical=(await imported.json())[0]||null;
         } catch { data.historyError='Imported history is temporarily unavailable.'; }
-        return respond(data);
+        return respond(data, data.error ? 503 : 200);
       }
       if (client.editable === false || access.role === 'viewer') fail(403, 'This account has analytics access. Contact Owen for website changes.');
       if(client.contentBackend==='supabase') {

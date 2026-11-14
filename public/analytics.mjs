@@ -10,13 +10,17 @@ export function analyticsPanel({ el, button, data, loading, error, range, change
   const main = el('main', { class: 'main analytics-main' },
     el('header', { class: 'topbar' }, el('div', {}, el('p', { class: 'eyebrow' }, siteName), el('h1', {}, 'Website analytics')),
       el('a', { class: 'button', href: liveUrl, target: '_blank', rel: 'noopener noreferrer' }, 'View live site')),
-    el('div', { class: 'analytics-controls' }, el('p', { class: 'muted' }, 'Traffic recorded by Netlify. Updates automatically every minute.'),
+    el('div', { class: 'analytics-controls' }, el('p', { class: 'muted' }, 'Netlify traffic for the selected window. Refreshes every minute.'),
       el('div', { class: 'analytics-range' }, el('label', { for: 'analytics-range' }, 'Live tracking range'),
         el('select', { id: 'analytics-range', disabled: loading, onChange: e => changeRange(e.target.value) }, ...Object.entries(analyticsRanges).map(([key, value]) => el('option', { value: key, selected: key === range }, value.label))),
         button(loading ? 'Refreshing…' : 'Refresh', refresh, 'button', { disabled: loading }))),
-    el('div', { 'aria-live': 'polite', role: 'status', class: 'analytics-update' }, loading ? 'Fetching this window from Netlify…' : data ? ['Fetched from Netlify ', time(data.updatedAt)] : ''),
+    el('div', { 'aria-live': 'polite', role: 'status', class: 'analytics-update' }, loading ? 'Fetching this window from Netlify…' : error ? 'The live Netlify report could not be refreshed.' : data ? ['Fetched from Netlify ', time(data.updatedAt)] : ''),
   );
-  if (error) { main.append(el('div', { class: 'warning', role: 'alert' }, error, button('Try again', refresh, 'button'))); return main; }
+  if (error) {
+    main.append(el('div', { class: 'warning', role: 'alert' }, error, button('Try again', refresh, 'button')));
+    if (data?.historical) main.append(el('details', { class: 'analytics-saved-report' }, el('summary', {}, 'Saved 30-day Netlify report · November 14, 2026'), historicalAnalyticsPanel({el,history:data.historical})));
+    return main;
+  }
   if (!data) return main;
   main.append(el('section', { class: 'analytics-window', 'aria-label': 'Selected Netlify time window' },
     el('div', {}, el('p', { class: 'eyebrow' }, 'NETLIFY'), el('h2', {}, analyticsRanges[data.range].label)),

@@ -181,7 +181,7 @@ async function api(action, options = {}) {
   const q = new URLSearchParams({ action, ...(S.client ? { site: S.client.id } : {}), ...options.query });
   const res = await fetch(`/api/portal?${q}`, { method: options.method || 'GET', headers: { Authorization: `Bearer ${await accessToken()}`, ...(options.body ? { 'content-type': 'application/json' } : {}) }, ...(options.body ? { body: JSON.stringify(options.body) } : {}) });
   if (res.status === 401) throw new Error('Your session has expired. Export unsaved changes, then sign out and back in.');
-  if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.error || 'This action could not be completed.'); }
+  if (!res.ok) { const data = await res.json().catch(() => ({})); throw Object.assign(new Error(data.error || 'This action could not be completed.'), { data }); }
   return options.blob ? res.blob() : res.json();
 }
 function branding() { return el('div', { class: 'brand' }, el('div', { class: 'brand-mark' }, el('img', { src: '/ob-logo-mark.png', alt: 'Owen B monogram' })), el('div', {}, el('strong', {}, 'Owen B'), el('small', {}, 'WEB DESIGN'))); }
@@ -262,7 +262,7 @@ async function openAnalytics() {
   const id = S.client.id, range = S.analyticsRange, request = ++S.analyticsRequest;
   S.analyticsLoading = true; S.analyticsError = ''; render();
   try { const data = await api('analytics', { query: { range } }); if (request === S.analyticsRequest && id === S.client?.id) S.analytics = data; }
-  catch (error) { if (request === S.analyticsRequest) { S.analytics = null; S.analyticsError = error.message; } }
+  catch (error) { if (request === S.analyticsRequest) { S.analytics = error.data?.historical ? error.data : null; S.analyticsError = error.message; } }
   finally { if (request === S.analyticsRequest) { S.analyticsLoading = false; if (S.view === 'analytics') render(); } }
 }
 async function openEditor() {
