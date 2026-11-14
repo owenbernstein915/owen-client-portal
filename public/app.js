@@ -1,12 +1,13 @@
 import { createVisualRefreshUrl } from './visual-preview.mjs';
 import { analyticsPanel } from './analytics.mjs';
+import { analyticsRefreshMs } from './analytics-ranges.mjs';
 import { mergeYouTubeEpisodes, youtubeVideoId } from './media-episodes.mjs';
 
 const app = document.querySelector('#app');
 const notice = document.querySelector('#notice');
 const S = { config: null, session: null, sites: [], client: null, data: null, content: null, section: 'hero', document: 'website', dirty: false, busy: false, uploads: [], previews: new Map(), loadedImages: new Map(), status: null, pendingCommit: null, recovery: false, visual: false, visualFieldsOpen: false, visualDevice: 'desktop', visualUrl: '', visualOrigin: '', frameReady: false, visualRefreshing: false, visualRefreshTimer: null, visualOverrides: new Map(), visualUploadsLoading: new Map(), visualResizeObserver: null, visualSyncRevision: 0 };
 let notificationTimer, refreshPromise;
-Object.assign(S, { view: 'analytics', analytics: null, analyticsDays: 30, analyticsError: '', analyticsLoading: false, analyticsRequest: 0 });
+Object.assign(S, { view: 'analytics', analytics: null, analyticsRange: '24h', analyticsError: '', analyticsLoading: false, analyticsRequest: 0 });
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   menu: '<path d="M4 5h16M4 12h16M4 19h16"/>',
@@ -258,9 +259,9 @@ async function openWorkspace() {
 }
 async function openAnalytics() {
   cancelVisualRefresh(); S.visual = false; S.visualResizeObserver?.disconnect(); S.view = 'analytics';
-  const id = S.client.id, request = ++S.analyticsRequest;
+  const id = S.client.id, range = S.analyticsRange, request = ++S.analyticsRequest;
   S.analyticsLoading = true; S.analyticsError = ''; render();
-  try { const data = await api('analytics', { query: { days: S.analyticsDays } }); if (request === S.analyticsRequest && id === S.client?.id) S.analytics = data; }
+  try { const data = await api('analytics', { query: { range } }); if (request === S.analyticsRequest && id === S.client?.id) S.analytics = data; }
   catch (error) { if (request === S.analyticsRequest) { S.analytics = null; S.analyticsError = error.message; } }
   finally { if (request === S.analyticsRequest) { S.analyticsLoading = false; if (S.view === 'analytics') render(); } }
 }
@@ -419,7 +420,7 @@ function visualPanel() {
 }
 function render() {
   if (S.view === 'analytics') {
-    app.replaceChildren(el('div', { class: 'shell analytics-shell' }, analyticsSidebar(), analyticsPanel({ el, button, data: S.analytics, loading: S.analyticsLoading, error: S.analyticsError, days: S.analyticsDays, changeDays: days => { S.analyticsDays = days; S.analytics = null; openAnalytics(); }, refresh: openAnalytics, siteName: S.client.name, liveUrl: S.client.previewUrl })));
+    app.replaceChildren(el('div', { class: 'shell analytics-shell' }, analyticsSidebar(), analyticsPanel({ el, button, data: S.analytics, loading: S.analyticsLoading, error: S.analyticsError, range: S.analyticsRange, changeRange: range => { S.analyticsRange = range; S.analytics = null; openAnalytics(); }, refresh: openAnalytics, siteName: S.client.name, liveUrl: S.client.previewUrl })));
     return;
   }
   if (S.visual) { S.frameReady = false; S.visualResizeObserver?.disconnect(); S.visualResizeObserver = null; }
@@ -539,6 +540,13 @@ function imageField(f, path, value) {
 }
 window.addEventListener('beforeunload', e => { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
 setInterval(refreshStatus, 20000);
+function refreshVisibleAnalytics() {
+  if (S.session && S.client && S.view === 'analytics' && !document.hidden && !S.analyticsLoading) openAnalytics();
+}
+setInterval(refreshVisibleAnalytics, analyticsRefreshMs);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && (!S.analytics || Date.now() - Date.parse(S.analytics.updatedAt) >= analyticsRefreshMs)) refreshVisibleAnalytics();
+});
 window.addEventListener('message', visualMessage);
 async function start() {
   try {

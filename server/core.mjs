@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { clients } from './clients.mjs';
 import { makeDatabaseContentHandler } from './database-content.mjs';
+import { makeNetlifyAnalytics } from './netlify-analytics.mjs';
 
 export class PortalError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -153,7 +154,7 @@ async function readBody(request) {
   catch { fail(400, 'The update could not be read.'); }
 }
 
-export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
+export function makeHandler({ env = process.env, fetcher = fetch, now = Date.now } = {}) {
   const respond = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
   async function external(url, init = {}) {
     try { return await fetcher(url, { ...init, signal: AbortSignal.timeout(12000) }); }
@@ -290,6 +291,7 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
   }
 
   const databaseContent = makeDatabaseContentHandler({env,external,respond,fail,validateContent,validateUpload,mergeContent});
+  const netlifyAnalytics = makeNetlifyAnalytics({env,external,fail,now});
   return async function handler(request) {
     try {
       const url = new URL(request.url); const action = url.searchParams.get('action') || 'config';
@@ -329,14 +331,8 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
       if (action === 'sites') return respond({ role: access.role, email: user.email, sites: clients.filter(c => access.sites.includes(c.id)).map(c => ({ id: c.id, name: c.name, location: c.location, previewUrl: c.liveUrl, editable: c.editable !== false && access.role !== 'viewer' })) });
       const client = clientFor(url.searchParams.get('site'), access);
       if (action === 'analytics') {
-        const days = Number(url.searchParams.get('days') || 30);
-        if (![7, 30, 90].includes(days)) fail(400, 'Choose 7, 30, or 90 days.');
-        const result = await external(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/rpc/portal_analytics`, {
-          method: 'POST', headers: { authorization: auth, apikey: env.SUPABASE_PUBLISHABLE_KEY, 'content-type': 'application/json' },
-          body: JSON.stringify({ p_site: client.id, p_days: days }),
-        });
-        if (!result.ok) fail(503, 'Analytics could not be loaded. Please try again or contact Owen.');
-        const data=await result.json();
+        if (url.searchParams.has('days')) fail(400, 'Choose Last Hour, Last 24 Hours, or Last 7 Days.');
+        const data = await netlifyAnalytics(client, url.searchParams.get('range') || '24h');
         try {
           const imported=await external(`${env.SUPABASE_URL.replace(/\/$/,'')}/rest/v1/portal_analytics_imports?site_id=eq.${client.id}&select=source,from_date,to_date,imported_at,data&order=imported_at.desc&limit=1`,{headers:{authorization:auth,apikey:env.SUPABASE_PUBLISHABLE_KEY}});
           if(!imported.ok) throw new Error('History unavailable');
