@@ -29,4 +29,12 @@ export const clients = [{
   draftUrl: '',
   uploadPrefix: 'public/images/uploads/',
   schema: littleDaisySchema,
+}, {
+  id: 'media-remixed',
+  name: 'Media Remixed',
+  location: 'With Jamie Stenziano',
+  netlifySiteIdEnv: 'MEDIA_REMIXED_NETLIFY_SITE_ID',
+  liveUrl: 'https://mediaremixed.com/',
+  editable: false,
+  schema: [],
 }];

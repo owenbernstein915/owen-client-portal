@@ -70,7 +70,7 @@ function approvedEmail(email, env) {
   if (!entries || typeof entries !== 'object' || Array.isArray(entries)) fail(503, 'Client account approvals need to be configured by Owen.');
   const key = email.trim().toLowerCase();
   const entry = Object.hasOwn(entries, key) ? entries[key] : null;
-  if (!entry || !['admin', 'editor'].includes(entry.role) || !Array.isArray(entry.sites) ||
+  if (!entry || !['admin', 'editor', 'viewer'].includes(entry.role) || !Array.isArray(entry.sites) ||
       !entry.sites.length || entry.sites.some(id => !clients.some(client => client.id === id))) return null;
   return { role: entry.role, sites: entry.role === 'admin' ? clients.map(c => c.id) : entry.sites };
 }
@@ -80,7 +80,7 @@ export function accessFor(userId, env, verifiedEmail) {
   try { entries = JSON.parse(env.PORTAL_ACCESS_JSON || '{}'); }
   catch { fail(503, 'Account access needs to be configured by Owen.'); }
   const entry = Object.hasOwn(entries, userId) ? entries[userId] : approvedEmail(verifiedEmail, env);
-  if (!entry || !['admin', 'editor'].includes(entry.role) || !Array.isArray(entry.sites)) {
+  if (!entry || !['admin', 'editor', 'viewer'].includes(entry.role) || !Array.isArray(entry.sites)) {
     fail(403, 'Your account has not been assigned a website. Please contact Owen.');
   }
   return { role: entry.role, sites: entry.role === 'admin' ? clients.map(c => c.id) : entry.sites };
@@ -291,7 +291,7 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
   return async function handler(request) {
     try {
       const url = new URL(request.url); const action = url.searchParams.get('action') || 'config';
-      const methods = { config: 'GET', signup: 'POST', sites: 'GET', content: 'GET', draft: 'PUT', publish: 'POST', status: 'GET', image: 'GET', history: 'GET', version: 'GET' };
+      const methods = { config: 'GET', signup: 'POST', sites: 'GET', analytics: 'GET', content: 'GET', draft: 'PUT', publish: 'POST', status: 'GET', image: 'GET', history: 'GET', version: 'GET' };
       if (!methods[action]) fail(404, 'Unknown action.');
       if (request.method !== methods[action]) fail(405, 'Method not allowed.');
       if (action === 'config') return respond({ configured: !!(env.SUPABASE_URL && env.SUPABASE_PUBLISHABLE_KEY && env.GITHUB_TOKEN && (env.PORTAL_ACCESS_JSON || env.PORTAL_SIGNUP_ALLOWLIST_JSON)), signupEnabled: !!env.PORTAL_SIGNUP_ALLOWLIST_JSON, supabaseUrl: env.SUPABASE_URL || '', supabaseKey: env.SUPABASE_PUBLISHABLE_KEY || '' });
@@ -320,8 +320,19 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
       const user = await userResponse.json();
       if (!user.id || !user.email_confirmed_at) fail(403, 'Please verify your email address before editing.');
       const access = accessFor(user.id, env, user.email);
-      if (action === 'sites') return respond({ role: access.role, email: user.email, sites: clients.filter(c => access.sites.includes(c.id)).map(c => ({ id: c.id, name: c.name, location: c.location, previewUrl: c.liveUrl })) });
+      if (action === 'sites') return respond({ role: access.role, email: user.email, sites: clients.filter(c => access.sites.includes(c.id)).map(c => ({ id: c.id, name: c.name, location: c.location, previewUrl: c.liveUrl, editable: c.editable !== false && access.role !== 'viewer' })) });
       const client = clientFor(url.searchParams.get('site'), access);
+      if (action === 'analytics') {
+        const days = Number(url.searchParams.get('days') || 30);
+        if (![7, 30, 90].includes(days)) fail(400, 'Choose 7, 30, or 90 days.');
+        const result = await external(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/rpc/portal_analytics`, {
+          method: 'POST', headers: { authorization: auth, apikey: env.SUPABASE_PUBLISHABLE_KEY, 'content-type': 'application/json' },
+          body: JSON.stringify({ p_site: client.id, p_days: days }),
+        });
+        if (!result.ok) fail(503, 'Analytics could not be loaded. Please try again or contact Owen.');
+        return respond(await result.json());
+      }
+      if (client.editable === false || access.role === 'viewer') fail(403, 'This account has analytics access. Contact Owen for website changes.');
       if (action === 'content') return respond({ ...await state(client), schema: client.schema });
       if (action === 'draft') return respond(await saveDraft(client, await readBody(request)));
       if (action === 'publish') return respond(await publish(client, await readBody(request)));

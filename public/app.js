@@ -1,9 +1,11 @@
 import { createVisualRefreshUrl } from './visual-preview.mjs';
+import { analyticsPanel } from './analytics.mjs';
 
 const app = document.querySelector('#app');
 const notice = document.querySelector('#notice');
 const S = { config: null, session: null, sites: [], client: null, data: null, content: null, section: 'hero', document: 'website', dirty: false, busy: false, uploads: [], previews: new Map(), loadedImages: new Map(), status: null, pendingCommit: null, recovery: false, visual: false, visualFieldsOpen: false, visualDevice: 'desktop', visualUrl: '', visualOrigin: '', frameReady: false, visualRefreshing: false, visualRefreshTimer: null, visualOverrides: new Map(), visualUploadsLoading: new Map(), visualResizeObserver: null, visualSyncRevision: 0 };
 let notificationTimer, refreshPromise;
+Object.assign(S, { view: 'analytics', analytics: null, analyticsDays: 30, analyticsError: '', analyticsLoading: false, analyticsRequest: 0 });
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   menu: '<path d="M4 5h16M4 12h16M4 19h16"/>',
@@ -229,7 +231,7 @@ function login(mode = 'signin', submittedEmail = '') {
   app.append(el('main', { class: 'login' }, el('section', { class: 'login-intro' }, branding(), el('div', {}, el('p', { class: 'eyebrow' }, 'OWEN B WEB DESIGN'), el('h1', {}, el('span', { class: 'outline-text' }, 'Your website.'), el('span', {}, 'In your hands.')), el('p', {}, 'Update your content. Share something new. Make it yours.')), el('p', { class: 'login-footer' }, 'Client portal · Owen B Web Design')),
     el('section', { class: 'login-panel' }, el('div', { class: 'login-form' }, el('p', { class: 'eyebrow' }, sent ? 'CHECK YOUR EMAIL' : signup ? 'ACCOUNT SETUP' : recover ? 'SECURE YOUR ACCOUNT' : 'WELCOME BACK'),
       el('h2', {}, sent ? 'Your setup link is on its way.' : signup ? 'Create your account.' : recover ? 'Choose your password' : 'Your website starts here.'),
-      el('p', { class: 'muted' }, sent ? `If ${submittedEmail} is approved for a website, open the link we sent, then choose your password.` : signup ? 'Enter the email Owen approved for your website. We’ll send a secure link to finish setup.' : recover ? 'Use a password you do not use elsewhere.' : 'Sign in to edit your website.'),
+      el('p', { class: 'muted' }, sent ? `If ${submittedEmail} is approved for a website, open the link we sent, then choose your password.` : signup ? 'Enter the email Owen approved for your website. We’ll send a secure link to finish setup.' : recover ? 'Use a password you do not use elsewhere.' : 'Sign in to view your analytics and manage your website.'),
       !sent && form, sent && el('div', { class: 'account-links' }, resend, signIn),
       !sent && !recover && !signup && el('div', { class: 'login-options' },
         forgot,
@@ -240,7 +242,7 @@ function login(mode = 'signin', submittedEmail = '') {
 async function signOut() {
   if (S.dirty && !confirm('You have unsaved changes. Sign out and discard them?')) return;
   try { await auth('logout?scope=local', null, 'POST', await accessToken()); } catch {}
-  setSession(null); S.dirty = false; S.client = null; S.content = null;
+  setSession(null); S.dirty = false; S.client = null; S.content = null; S.data = null; S.analytics = null; S.analyticsRequest += 1;
   clearPreviews(); login();
 }
 function clearPreviews() {
@@ -251,7 +253,29 @@ function clearPreviews() {
 async function openWorkspace() {
   const data = await api('sites'); S.sites = data.sites; S.role = data.role; S.email = data.email;
   if (!S.sites.length) throw new Error('No website is assigned to this account. Contact Owen.');
-  S.client = S.sites[0]; await loadContent();
+  S.client = S.sites[0]; S.data = null; await openAnalytics();
+}
+async function openAnalytics() {
+  cancelVisualRefresh(); S.visual = false; S.visualResizeObserver?.disconnect(); S.view = 'analytics';
+  const id = S.client.id, request = ++S.analyticsRequest;
+  S.analyticsLoading = true; S.analyticsError = ''; render();
+  try { const data = await api('analytics', { query: { days: S.analyticsDays } }); if (request === S.analyticsRequest && id === S.client?.id) S.analytics = data; }
+  catch (error) { if (request === S.analyticsRequest) { S.analytics = null; S.analyticsError = error.message; } }
+  finally { if (request === S.analyticsRequest) { S.analyticsLoading = false; if (S.view === 'analytics') render(); } }
+}
+async function openEditor() {
+  if (S.client.editable === false) return;
+  if (S.data) { S.view = 'editor'; render(); }
+  else { try { await loadContent(); } catch (error) { toast(error.message, true); await openAnalytics(); } }
+}
+function analyticsSidebar() {
+  const sitePicker = S.sites.length > 1 ? el('select', { 'aria-label': 'Website', onChange: async e => {
+    if (S.dirty && !confirm('Discard unsaved changes and switch websites?')) { e.target.value = S.client.id; return; }
+    S.client = S.sites.find(c => c.id === e.target.value); S.data = null; S.content = null; S.dirty = false; S.analytics = null; S.pendingCommit = null; clearPreviews(); await openAnalytics();
+  } }, ...S.sites.map(c => el('option', { value: c.id, selected: c.id === S.client.id }, c.name))) : el('strong', {}, S.client.name);
+  return el('aside', { class: 'sidebar' }, branding(), el('div', { class: 'workspace-label' }, 'YOUR WORKSPACE'), el('div', { class: 'site-name' }, sitePicker, el('small', {}, S.client.location)),
+    el('nav', { 'aria-label': 'Workspace' }, button([icon('grid'), 'Analytics'], openAnalytics, 'nav-button active'), S.client.editable !== false && button([icon('edit'), 'Edit website'], openEditor, 'nav-button')),
+    el('div', { class: 'sidebar-bottom' }, el('div', { class: 'account' }, el('span', { class: 'avatar' }, S.email[0].toUpperCase()), el('div', {}, el('strong', {}, S.role === 'admin' ? 'Administrator' : S.role === 'viewer' ? 'Website analytics' : 'Website editor'), el('small', {}, S.email))), button('Sign out', signOut, 'text-button')));
 }
 async function loadContent() {
   app.replaceChildren(el('div', { class: 'loading' }, 'Loading your website…'));
@@ -259,7 +283,7 @@ async function loadContent() {
   S.document = data.schema.find(d => d.name === S.document)?.name || data.schema[0].name;
   const doc = data.schema.find(d => d.name === S.document);
   S.section = doc.fields.find(f => f.name === S.section)?.name || doc.fields[0]?.name;
-  render(); refreshStatus();
+  S.view = 'editor'; render(); refreshStatus();
 }
 function dirty() { S.dirty = true; updateControls(); syncVisualContent(); }
 function get(path) { return path.reduce((a, p) => a?.[p], S.content); }
@@ -311,7 +335,7 @@ async function importDraft(file) {
   } catch (e) { toast(e.message, true); }
 }
 async function refreshStatus() {
-  if (!S.session || !S.client || document.hidden) return;
+  if (!S.session || !S.client || S.view === 'analytics' || document.hidden) return;
   const id = S.client.id;
   try {
     const result = await api('status'); if (S.client?.id !== id) return; S.status = result;
@@ -379,17 +403,21 @@ function visualPanel() {
     el('p', { class: 'visual-footnote' }, 'This is the real website in preview mode. Site visitors continue seeing the published content until you publish your draft.'));
 }
 function render() {
+  if (S.view === 'analytics') {
+    app.replaceChildren(el('div', { class: 'shell analytics-shell' }, analyticsSidebar(), analyticsPanel({ el, button, data: S.analytics, loading: S.analyticsLoading, error: S.analyticsError, days: S.analyticsDays, changeDays: days => { S.analyticsDays = days; S.analytics = null; openAnalytics(); }, refresh: openAnalytics, siteName: S.client.name, liveUrl: S.client.previewUrl })));
+    return;
+  }
   if (S.visual) { S.frameReady = false; S.visualResizeObserver?.disconnect(); S.visualResizeObserver = null; }
   const doc = S.data.schema.find(d => d.name === S.document);
   const selected = doc.list ? doc : doc.fields.find(f => f.name === S.section) || doc.fields[0];
   const nav = S.data.schema.map(d => button([icon(d.list ? 'menu' : 'grid'), el('span', {}, d.list ? 'Menus' : 'Website content')], () => { S.document = d.name; S.section = d.fields[0]?.name; render(); }, `nav-button ${d.name === S.document ? 'active' : ''}`));
   const sitePicker = S.sites.length > 1 ? el('select', { 'aria-label': 'Website', onChange: async e => {
     if (S.dirty && !confirm('Discard unsaved changes and switch websites?')) { e.target.value = S.client.id; return; }
-    S.client = S.sites.find(c => c.id === e.target.value); S.pendingCommit = null; S.visual = false; S.visualFieldsOpen = false;
-    try { await loadContent(); } catch (err) { toast(err.message, true); }
+    S.client = S.sites.find(c => c.id === e.target.value); S.pendingCommit = null; S.visual = false; S.visualFieldsOpen = false; S.data = null; S.content = null; S.dirty = false; S.analytics = null;
+    try { await openAnalytics(); } catch (err) { toast(err.message, true); }
   } }, ...S.sites.map(c => el('option', { value: c.id, selected: c.id === S.client.id }, c.name))) : el('strong', {}, S.client.name);
   const sidebar = el('aside', { class: 'sidebar' }, branding(), el('div', { class: 'workspace-label' }, 'YOUR WORKSPACE'), el('div', { class: 'site-name' }, sitePicker, el('small', {}, S.client.location)),
-    el('nav', { 'aria-label': 'Editor' }, nav),
+    el('nav', { 'aria-label': 'Editor' }, button([icon('grid'), 'Analytics'], openAnalytics, 'nav-button'), nav),
     el('div', { class: 'sidebar-bottom' }, button('Version history', history, 'nav-button'), el('div', { class: 'account' }, el('span', { class: 'avatar' }, S.email[0].toUpperCase()), el('div', {}, el('strong', {}, S.role === 'admin' ? 'Administrator' : 'Website editor'), el('small', {}, S.email))), button('Sign out', signOut, 'text-button')));
   const sections = !doc.list && el('div', { class: 'section-picker' }, el('label', { for: 'section' }, 'Editing section'), el('select', { id: 'section', onChange: e => { S.section = e.target.value; render(); } }, ...doc.fields.map(f => el('option', { value: f.name, selected: selected.name === f.name }, f.label))));
   const editor = el('form', { id: 'editor', onSubmit: e => e.preventDefault() },
