@@ -48,7 +48,7 @@ test('analytics authorizes the user and site before any Netlify query; secrets s
   const data=await response.json(); assert.equal(data.siteId,'media-remixed'); assert.equal(data.source,'netlify');
   assert.ok(!JSON.stringify(data).includes(env.NETLIFY_API_TOKEN));
   const netlify=calls.filter(c=>c.url.includes('api.netlify'));
-  assert.equal(netlify.length,3);
+  assert.equal(netlify.length,7);
   assert.ok(netlify.every(c=>c.url.includes('/sites/media-netlify-id/') && c.headers.authorization==='Bearer server-only-secret'));
   const imported=calls.at(-1); assert.equal(imported.headers.authorization,'Bearer jamie'); assert.ok(imported.url.includes('site_id=eq.media-remixed'));
   assert.ok(!calls.some(c=>c.url.includes('rpc/portal_analytics')));
@@ -78,7 +78,7 @@ test('refresh advances the real source window and obtains fresh Netlify numbers 
   const second=await (await handler(request('media-remixed','jamie','&range=1h'))).json();
   assert.equal(Date.parse(second.from)-Date.parse(first.from),120000);
   assert.equal(first.pageViews,5); assert.equal(second.pageViews,21);
-  assert.equal(calls.filter(c=>c.url.includes('api.netlify')).length,6);
+  assert.equal(calls.filter(c=>c.url.includes('api.netlify')).length,14);
 });
 
 test('retention clamping re-queries every metric for one consistent available window',async()=>{
@@ -86,7 +86,7 @@ test('retention clamping re-queries every metric for one consistent available wi
   const response=await handler(request('media-remixed','jamie','&range=7d')); assert.equal(response.status,200);
   const data=await response.json(); assert.equal(data.coverageLimited,true);
   assert.equal(Date.parse(data.from),end-10079*60000); assert.equal(data.pageViews,28);
-  assert.equal(calls.filter(c=>c.url.includes('api.netlify')).length,6);
+  assert.equal(calls.filter(c=>c.url.includes('api.netlify')).length,14);
 });
 
 test('invalid ranges, upstream failures and incomplete source data never turn into misleading zero traffic',async()=>{

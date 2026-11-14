@@ -23,6 +23,12 @@ export function makeNetlifyAnalytics({ env, external, fail, now = Date.now }) {
     const invalid = () => fail(503, 'Netlify returned an incomplete analytics report. Please refresh; no estimated counts are shown.');
 
     async function query(type, queries) {
+      // Match the official client's one-query-per-request contract. Some
+      // Netlify endpoints reject a multi-query payload even though it is an array.
+      if (queries.length > 1) {
+        const parts = await Promise.all(queries.map(item => query(type, [item])));
+        return { data: parts.flatMap(part => part.data), meta: { responses: parts.flatMap(part => part.meta.responses) } };
+      }
       const params = new URLSearchParams({ from_ts: String(from), to_ts: String(to - 1) });
       if (type === 'timeseries') params.set('interval', String(minute));
       const response = await external(`https://api.netlify.com/api/v1/sites/${encodeURIComponent(siteId)}/observability/query/${type}?${params}`, {
@@ -30,7 +36,7 @@ export function makeNetlifyAnalytics({ env, external, fail, now = Date.now }) {
         headers: { authorization: `Bearer ${env.NETLIFY_API_TOKEN}`, 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ data: [{ attributes: { queries } }] }),
       });
-      if (!response.ok) fail(503, 'Netlify analytics is temporarily unavailable. Please refresh or contact Owen.');
+      if (!response.ok) fail(503, `Netlify analytics is temporarily unavailable (HTTP ${response.status}). Please refresh or contact Owen.`);
       let data;
       try { data = await response.json(); } catch { invalid(); }
       if (!Array.isArray(data?.data) || !Array.isArray(data?.meta?.responses) || data.meta.responses.length !== queries.length) invalid();
