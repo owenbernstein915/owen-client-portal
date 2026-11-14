@@ -1,0 +1,100 @@
+{
+  "site": {
+    "title": "Media Remixed",
+    "description": "Media Remixed with Jamie Stenziano. Conversations with the people reshaping media, technology, and entertainment.",
+    "email": "mediaremixedpodcast@gmail.com"
+  },
+  "hero": {
+    "host_name": "Jamie Stenziano",
+    "intro_title": "The world is changing.\nLet’s talk about it.",
+    "intro_text": "Media Remixed explores the people and ideas reshaping technology, media, and entertainment. Join Jamie Stenziano for a different perspective on what comes next.",
+    "trailer_label": "MEET MEDIA REMIXED",
+    "trailer_title": "A different frequency.",
+    "trailer_status": "The show in 36 seconds."
+  },
+  "about": {
+    "eyebrow": "MEET YOUR HOST",
+    "name": "Jamie\nStenziano",
+    "tagline": "Curious about what’s changing.\nAnd the people behind it.",
+    "biography": "Jamie is a researcher in the technology, media, and telecommunications sectors. Jamie began his career helping media businesses develop streaming services, plan launches, and understand younger audiences. Along the way, he conducted more than 1,000 interviews and focus groups, hearing from everyone from executives to professional athletes.",
+    "image": "/images/media-remixed/jamie-stenziano.jpg",
+    "image_alt": "Jamie Stenziano, host of Media Remixed",
+    "show_title": "About the show.",
+    "show_description": "Technology changes how we create, connect, and experience the world. Media Remixed brings a fresh perspective to those changes through conversations about the future of media, technology, and entertainment."
+  },
+  "episodes": {
+    "title": "EPISODES",
+    "description": "The next conversation starts here.",
+    "items": [
+      {
+        "title": "Episode 01",
+        "description": "Your Description here",
+        "url": "",
+        "image": "",
+        "image_alt": "",
+        "available": true
+      },
+      {
+        "title": "Episode 02",
+        "description": "Your Description here",
+        "url": "",
+        "image": "",
+        "image_alt": "",
+        "available": true
+      },
+      {
+        "title": "Episode 03",
+        "description": "Your Description here",
+        "url": "",
+        "image": "",
+        "image_alt": "",
+        "available": true
+      },
+      {
+        "title": "Episode 04",
+        "description": "Your Description here",
+        "url": "",
+        "image": "",
+        "image_alt": "",
+        "available": true
+      },
+      {
+        "title": "Episode 05",
+        "description": "Your Description here",
+        "url": "",
+        "image": "",
+        "image_alt": "",
+        "available": true
+      },
+      {
+        "title": "Episode 06",
+        "description": "Your Description here",
+        "url": "",
+        "image": "",
+        "image_alt": "",
+        "available": true
+      }
+    ]
+  },
+  "newsletter": {
+    "eyebrow": "THE NEWSLETTER",
+    "title": "Stay in\nthe mix.",
+    "tagline": "Fresh perspectives, in your inbox.",
+    "description": "New episodes and ideas worth revisiting.\nA little more Media Remixed, whenever you’re ready.",
+    "signup_title": "Keep the\nconversation going.",
+    "button_text": "Subscribe on Substack"
+  },
+  "listen": {
+    "title": "Listen & follow",
+    "description": "Listen or watch anywhere, anytime."
+  },
+  "links": {
+    "youtube_url": "https://youtube.com/@mediaremixed?si=dTd9KzQk1Q1U7Ewb",
+    "instagram_url": "https://www.instagram.com/mediaremixed/?utm_source=ig_web_button_share_sheet",
+    "linkedin_url": "https://www.linkedin.com/company/media-remixed/",
+    "tiktok_url": "https://www.tiktok.com/@mediaremixed",
+    "spotify_url": "",
+    "apple_podcasts_url": "",
+    "substack_url": "https://mediaremixed.substack.com/"
+  }
+}

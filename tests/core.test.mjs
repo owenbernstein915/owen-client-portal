@@ -7,11 +7,11 @@ import { clients } from '../server/clients.mjs';
 const initial = { website: JSON.parse(await readFile(new URL('./fixtures/site.json', import.meta.url))), menus: JSON.parse(await readFile(new URL('./fixtures/menu.json', import.meta.url))) };
 const hash = x => createHash('sha1').update(JSON.stringify(x)).digest('hex');
 const env = { SUPABASE_URL: 'https://test.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'public-key', GITHUB_TOKEN: 'server-only', PORTAL_ACCESS_JSON: JSON.stringify({ editor: { role: 'editor', sites: ['libelula'] }, outsider: { role: 'editor', sites: [] }, admin: { role: 'admin', sites: [] } }), PORTAL_SIGNUP_ALLOWLIST_JSON: JSON.stringify({ 'new@little-daisy.test': { role: 'editor', sites: ['little-daisy'] }, 'new@libelula.test': { role: 'editor', sites: ['libelula'] } }) };
-function fakeRepo({ autoconfirm = false, otpStatus = 200 } = {}) {
+function fakeRepo({ autoconfirm = false, otpStatus = 200, client = clients[0], content = initial } = {}) {
   const blobs = new Map(), trees = new Map(), commits = new Map(), refs = new Map();
   const writes = [], otpCalls = []; let sequence = 0;
   const blob = content => { const id = hash(content); blobs.set(id, content); return id; };
-  const initialTree = Object.fromEntries(clients[0].schema.map(s => [s.path, blob(JSON.stringify(initial[s.name], null, 2) + '\n')]));
+  const initialTree = Object.fromEntries(client.schema.map(s => [s.path, blob(JSON.stringify(content[s.name], null, 2) + '\n')]));
   const treeId = hash(initialTree); trees.set(treeId, initialTree);
   const initialSha = hash('initial'); commits.set(initialSha, { sha: initialSha, tree: { sha: treeId }, parents: [] }); refs.set('main', initialSha);
   const output = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
@@ -28,7 +28,7 @@ function fakeRepo({ autoconfirm = false, otpStatus = 200 } = {}) {
       };
       return users[id] ? output({ id, email: users[id].email, email_confirmed_at: users[id].confirmed ? '2026-01-01' : null }) : output({}, 401);
     }
-    const path = decodeURIComponent(url.pathname.replace('/repos/owenbernstein915/libelula-pages-cms', ''));
+    const path = decodeURIComponent(url.pathname.replace(`/repos/${client.owner}/${client.repo}`, ''));
     if (method !== 'GET') writes.push({ path, method, body });
     if (path.startsWith('/git/ref/heads/')) { const sha = refs.get(path.slice('/git/ref/heads/'.length)); return sha ? output({ object: { sha } }) : output({}, 404); }
     if (path.startsWith('/contents/')) { const commit = commits.get(url.searchParams.get('ref')); const id = commit && trees.get(commit.tree.sha)[path.slice('/contents/'.length)]; return id ? output({ type: 'file', encoding: 'base64', content: Buffer.from(blobs.get(id)).toString('base64'), size: Buffer.byteLength(blobs.get(id)), sha: id }) : output({}, 404); }
@@ -213,3 +213,53 @@ test('stale draft save stops when the same field changed in the draft and live s
   assert.equal(repo.writes.length, writeCount, 'a conflicting rebase must not write to GitHub');
 });
 
+
+const mediaClient = clients.find(client => client.id === 'media-remixed');
+const mediaContent = { website: JSON.parse(await readFile(new URL('../content/media-remixed.json', import.meta.url))) };
+test('Media Remixed editors save isolated drafts, publish supported content and retain other website restrictions', async () => {
+  const repo = fakeRepo({ client: mediaClient, content: mediaContent });
+  const mediaEnv = { ...env, PORTAL_ACCESS_JSON: JSON.stringify({ editor: {role:'editor',sites:['media-remixed']}, outsider:{role:'editor',sites:['little-daisy']} }) };
+  const handler = makeHandler({env:mediaEnv, fetcher:repo.fetcher});
+  const req = (action, options = {}) => request(action,{site:'media-remixed',...options});
+  const sites = await (await handler(req('sites'))).json();
+  assert.deepEqual(sites.sites.map(s => [s.id,s.editable]), [['media-remixed',true]]);
+  assert.equal((await handler(req('content',{token:'outsider'}))).status,403);
+  assert.equal((await handler(request('content',{site:'little-daisy'}))).status,403);
+  const state = await (await handler(req('content'))).json();
+  const content = structuredClone(state.content);
+  content.website.about.biography = 'Updated host biography';
+  content.website.episodes.items[0] = {...content.website.episodes.items[0],title:'New conversation',url:'https://www.youtube.com/watch?v=example'};
+  content.website.links.substack_url = 'https://mediaremixed.substack.com/';
+  const saved = await handler(req('draft',{method:'PUT',body:{content,uploads:[],draftSha:state.draftSha,baseMainSha:state.baseMainSha}}));
+  assert.equal(saved.status,200,await saved.clone().text());
+  const draft = await saved.json();
+  assert.equal(repo.refs.get('main'),repo.initialSha);
+  assert.equal(repo.refs.get('media-remixed-draft'),draft.draftSha);
+  const published = await handler(req('publish',{method:'POST',body:{draftSha:draft.draftSha}}));
+  assert.equal(published.status,200,await published.clone().text());
+  const next = await (await handler(req('content'))).json();
+  assert.equal(next.hasDraft,false);
+  assert.equal(next.content.website.about.biography,'Updated host biography');
+  assert.equal(next.content.website.episodes.items[0].title,'New conversation');
+  const written = repo.writes.filter(write => write.path === '/git/trees').at(-1).body.tree.map(entry => entry.path).sort();
+  assert.deepEqual(written,['.client-portal/published.json','content/media-remixed.json']);
+});
+test('Media Remixed rejects executable links and unsafe photo paths before saving', () => {
+  validateContent(mediaContent,mediaClient);
+  const bad = structuredClone(mediaContent); bad.website.episodes.items[0].url='javascript:alert(1)';
+  assert.throws(() => validateContent(bad,mediaClient),/valid website/);
+  bad.website.episodes.items[0].url=''; bad.website.about.image='/images/../../secret';
+  assert.throws(() => validateContent(bad,mediaClient),/website image/);
+});
+test('Media Remixed publishing status tracks the content deployment and links to the correct live site', async () => {
+  const mediaEnv = {...env,NETLIFY_API_TOKEN:'server-only-netlify',PORTAL_ACCESS_JSON:JSON.stringify({editor:{role:'editor',sites:['media-remixed']}})};
+  const calls=[];
+  const handler=makeHandler({env:mediaEnv,fetcher:async(url,init)=>{
+    calls.push(url);
+    if(url.endsWith('/auth/v1/user'))return Response.json({id:'editor',email:'editor@example.com',email_confirmed_at:'2026-11-14'});
+    return Response.json([{branch:'main',context:'production',state:'ready',commit_ref:'a'.repeat(40),ssl_url:'https://owenbclientdashboard.netlify.app'}]);
+  }});
+  const result=await (await handler(request('status',{site:'media-remixed'}))).json();
+  assert.equal(result.state,'ready'); assert.equal(result.url,'https://mediaremixed.com/');
+  assert.ok(calls.at(-1).includes('/sites/33986ed5-b479-4f6c-bc42-9bc5513ebec6/deploys'));
+});

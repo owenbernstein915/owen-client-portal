@@ -19,7 +19,7 @@ The client clicks **Create your account**, enters that email, opens the Supabase
 No Supabase database tables or service-role key are used by this flow. A new authorized email gains access through the server-side allowlist only after confirming ownership of that address.
 # Website analytics
 
-All assigned clients can open Analytics after signing in. Little Daisy and Libélula retain their content editors; Media Remixed currently has analytics access only. The server validates the Supabase session and website assignment before calling the database with the user's own JWT. Supabase row-level policies independently restrict every site's data to its assigned accounts.
+All assigned clients can open Analytics after signing in. Little Daisy, Libélula, and Media Remixed have content editors for assigned editors and administrators. Viewer accounts retain analytics-only access. The server validates the Supabase session and website assignment before calling the database with the user's own JWT. Supabase row-level policies independently restrict every site's data to its assigned accounts.
 
 `supabase/analytics.sql` records the deployed schema. `supabase/functions/portal-collect/index.ts` is the write-only collector; it authenticates the publishable API key itself (`verify_jwt = false` for modern keys), validates production origins, drops known bots and privacy opt-outs, and limits a visitor to 60 events per minute. It stores paths, referring hostnames, device categories, and a daily rotating keyed visitor hash. No raw IP, full referrer URL, query string, cookie, or persistent browser identifier is stored. Browser blockers can reduce counts. Daily visitor estimates reset at midnight UTC; the dashboard averages those daily counts, not cross-day unique people.
 
@@ -27,3 +27,9 @@ Netlify snippet injection adds `<script defer src="https://owenbclientdashboard.
 
 To add access, create the Supabase account, assign the website in the server-owned access configuration, and insert the matching `(site_id, user_id)` into `portal_site_memberships`. Clients have no database write permissions. Secrets stay in Netlify Functions or Supabase's managed function environment.
 
+
+## Media Remixed editing
+
+Media Remixed uses `content/media-remixed.json` in this repository. The portal saves drafts on `media-remixed-draft` and publishes reviewed content to `main`. The normal portal build validates and publishes the public content feed; the live Media Remixed pages apply it through `public/media-remixed.js`. Drafts are never included in the public feed. Photos live under `public/images/` and are uploaded through the existing validated image workflow. Build status follows this portal deployment, while the live-site link continues to open mediaremixed.com.
+
+The Media Remixed static source archive retains its original design, video and assets as the fallback. Its page headers permit embedding only by this portal and itself; preview messages accept only the exact portal origin and parent window. Keep the content script in the site’s shared HTML when deploying future design changes.

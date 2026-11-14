@@ -1,5 +1,6 @@
 import libelulaSchema from './schema.mjs';
 import littleDaisySchema from './little-daisy-schema.mjs';
+import mediaRemixedSchema from './media-remixed-schema.mjs';
 
 // Add one entry per client. Repository paths are controlled by you, never by
 // request parameters. Do not put tokens or passwords in this file.
@@ -33,8 +34,15 @@ export const clients = [{
   id: 'media-remixed',
   name: 'Media Remixed',
   location: 'With Jamie Stenziano',
+  owner: 'owenbernstein915',
+  repo: 'owen-client-portal',
+  branch: 'main',
+  draftBranch: 'media-remixed-draft',
+  uploadPrefix: 'public/images/uploads/',
+  // Publishing the portal also publishes the public Media Remixed content feed.
+  publishingSiteId: '33986ed5-b479-4f6c-bc42-9bc5513ebec6',
   netlifySiteIdEnv: 'MEDIA_REMIXED_NETLIFY_SITE_ID',
   liveUrl: 'https://mediaremixed.com/',
-  editable: false,
-  schema: [],
+  draftUrl: '',
+  schema: mediaRemixedSchema,
 }];

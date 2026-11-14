@@ -37,7 +37,7 @@ function setSession(data) {
   else sessionStorage.removeItem('owen-portal-session');
 }
 function visualPageUrl() {
-  const expected = { libelula: 'https://libelulamontclair.com', 'little-daisy': 'https://littledaisybakeshop.com' }[S.client?.id];
+  const expected = { libelula: 'https://libelulamontclair.com', 'little-daisy': 'https://littledaisybakeshop.com', 'media-remixed': 'https://mediaremixed.com' }[S.client?.id];
   if (!expected || !S.client?.previewUrl) return null;
   try {
     const url = new URL(S.client.previewUrl);

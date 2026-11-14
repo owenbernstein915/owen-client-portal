@@ -276,7 +276,7 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
     return { mainSha, message: 'Changes sent for publishing. The website updates when its build finishes.' };
   }
   async function netlify(client, mode) {
-    const siteId = env[client.netlifySiteIdEnv];
+    const siteId = client.publishingSiteId || env[client.netlifySiteIdEnv];
     if (!siteId || !env.NETLIFY_API_TOKEN) return { configured: false, url: mode === 'draft' ? client.draftUrl : client.liveUrl };
     const headers = { authorization: `Bearer ${env.NETLIFY_API_TOKEN}` };
     const response = await external(`https://api.netlify.com/api/v1/sites/${encodeURIComponent(siteId)}/deploys?per_page=30`, { headers });
@@ -285,7 +285,7 @@ export function makeHandler({ env = process.env, fetcher = fetch } = {}) {
     const desiredBranch = mode === 'draft' ? client.draftBranch : client.branch;
     const deploy = deploys.find(d => d.branch === desiredBranch && (mode === 'draft' ? d.context === 'branch-deploy' : d.context === 'production'));
     if (!deploy) return { configured: true, state: 'waiting', url: mode === 'draft' ? client.draftUrl : client.liveUrl };
-    return { configured: true, state: deploy.state, commit: deploy.commit_ref, url: mode === 'draft' ? (deploy.deploy_ssl_url || deploy.deploy_url) : (deploy.ssl_url || deploy.url), updatedAt: deploy.updated_at };
+    return { configured: true, state: deploy.state, commit: deploy.commit_ref, url: mode === 'draft' ? (deploy.deploy_ssl_url || deploy.deploy_url) : client.publishingSiteId ? client.liveUrl : (deploy.ssl_url || deploy.url), updatedAt: deploy.updated_at };
   }
 
   return async function handler(request) {
