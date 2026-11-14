@@ -305,6 +305,7 @@ function set(path, value) { let dest = S.content; for (const p of path.slice(0, 
 function dateText(value) { return value ? new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value)) : ''; }
 function updateControls() {
   const save = document.querySelector('#save'); const publish = document.querySelector('#publish');
+  const youtubeSync=document.querySelector('#youtube-sync'); if(youtubeSync) youtubeSync.disabled=S.busy;
   if (save) { save.disabled = S.busy || !S.dirty; save.textContent = S.busy ? 'Working…' : 'Save draft'; }
   if (publish) publish.disabled = S.busy || S.dirty || !S.data.hasDraft || S.data.stale;
   const caption = document.querySelector('#save-status');
@@ -438,7 +439,7 @@ function render() {
     S.client.id==='media-remixed' && selected.name==='episodes' && el('div',{class:'editing-note'},
       el('p',{},'New public uploads from Media Remixed on YouTube appear automatically. You can edit their website titles and descriptions, hide episodes, reorder them, or add an episode manually. Changes here do not change YouTube.'),
       el('p',{},S.data.youtube?.unavailable ? 'YouTube could not be checked. Saved episodes are still available.' : S.data.youtube?.items?.length ? `${S.data.youtube.items.length} YouTube videos connected${S.data.youtube.stale ? ' · using the last saved update' : ''}.` : 'YouTube is connected. No public videos have been uploaded yet.'),
-      button('Check YouTube for new episodes',syncYouTube,'button',{disabled:S.busy})),
+      button('Check YouTube for new episodes',syncYouTube,'button',{id:'youtube-sync',disabled:S.busy})),
     doc.list && el('p', { class: 'editing-note' }, 'Menu changes update this website. Update Toast separately for online ordering prices and availability.'),
     selected.name === 'visit' && el('p', { class: 'editing-note' }, 'These hours appear on your website. Ask Owen to update the reservation time picker when your schedule changes.'),
     doc.list ? field(doc, [doc.name], true) : field(selected, [doc.name, selected.name], true));
