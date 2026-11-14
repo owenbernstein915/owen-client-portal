@@ -13,7 +13,8 @@ export function makeNetlifyAnalytics({ env, external, fail, now = Date.now }) {
   return async function netlifyAnalytics(client, range, { diagnostics = false } = {}) {
     if (!Object.hasOwn(analyticsRanges, range)) fail(400, 'Choose Last Hour, Last 24 Hours, or Last 7 Days.');
     const siteId = env[client.netlifySiteIdEnv];
-    if (!siteId || !env.NETLIFY_API_TOKEN) fail(503, 'The Netlify analytics connection needs to be configured by Owen.');
+    const token = env.NETLIFY_ANALYTICS_TOKEN || env.NETLIFY_API_TOKEN;
+    if (!siteId || !token) fail(503, 'The Netlify analytics connection needs to be configured by Owen.');
     const config = analyticsRanges[range];
     // Query complete minutes: Netlify time-series buckets otherwise include
     // events outside the selected range. The displayed end is exclusive.
@@ -32,7 +33,7 @@ export function makeNetlifyAnalytics({ env, external, fail, now = Date.now }) {
       if (type === 'timeseries') params.set('interval', String(minute));
       const response = await external(`https://api.netlify.com/api/v1/sites/${encodeURIComponent(siteId)}/observability/query/${type}?${params}`, {
         method: 'POST',
-        headers: { authorization: `Bearer ${env.NETLIFY_API_TOKEN}`, 'content-type': 'application/json', accept: 'application/json' },
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ data: [{ attributes: { queries } }] }),
       });
       if (!response.ok) {
@@ -40,7 +41,7 @@ export function makeNetlifyAnalytics({ env, external, fail, now = Date.now }) {
         if (diagnostics) {
           const error = await response.json().catch(() => ({}));
           const message = error.msg || error.message || error.error;
-          if (typeof message === 'string') detail = ` ${message.replaceAll(env.NETLIFY_API_TOKEN, '[redacted]').slice(0,200)}`;
+          if (typeof message === 'string') detail = ` ${message.replaceAll(token, '[redacted]').slice(0,200)}`;
 
         }
         fail(503, `Netlify analytics is temporarily unavailable (HTTP ${response.status}).${detail} Please refresh or contact Owen.`);

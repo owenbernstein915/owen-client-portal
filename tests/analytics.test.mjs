@@ -10,9 +10,9 @@ const env = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_PUBLISHABLE_
 const request = (site = 'media-remixed', token = 'jamie', suffix = '', action = 'analytics', method = 'GET') => new Request(`https://portal.test/api/portal?action=${action}&site=${site}${suffix}`, { method, headers: token ? { Authorization: `Bearer ${token}` } : {} });
 const events = [[0,19],[10,2],[60,3],[61,5],[1440,7],[1441,11],[10080,13],[10081,17]].map(([ago,count]) => ({time:end-ago*60000,count}));
 
-function setup({ status = 200, malformed = false, limited = false, retention = false, clock = () => now, historyStatus = 200 } = {}) {
+function setup({ status = 200, malformed = false, limited = false, retention = false, clock = () => now, historyStatus = 200, analyticsToken } = {}) {
   const calls = [];
-  const handler = makeHandler({ env, now: clock, fetcher: async (url, init) => {
+  const handler = makeHandler({ env: {...env, ...(analyticsToken ? {NETLIFY_ANALYTICS_TOKEN:analyticsToken} : {})}, now: clock, fetcher: async (url, init) => {
     calls.push({ url, ...init });
     if (url.endsWith('/auth/v1/user')) { const id = init.headers.authorization.split(' ')[1]; return Response.json({ id, email: `${id}@example.com`, email_confirmed_at: '2026-11-14' }); }
     if (url.includes('/rest/v1/portal_analytics_imports?')) return Response.json([{source:'netlify',data:{pageViews:300}}], {status:historyStatus});
@@ -105,4 +105,13 @@ test('Media Remixed viewer sees only its assigned analytics and cannot edit or p
   assert.deepEqual(sites.sites.map(s=>[s.id,s.editable]),[['media-remixed',false]]);
   for(const [action,method] of [['content','GET'],['history','GET'],['draft','PUT'],['publish','POST']]) assert.equal((await handler(request('media-remixed','jamie','',action,method))).status,403);
   assert.ok(calls.every(c=>c.url.endsWith('/auth/v1/user')));
+});
+
+
+test('a dedicated analytics token is used only on the server and does not replace the deployment credential',async()=>{
+  const {handler,calls}=setup({analyticsToken:'dedicated-analytics-secret'});
+  const response=await handler(request()); assert.equal(response.status,200);
+  assert.ok(!JSON.stringify(await response.json()).includes('dedicated-analytics-secret'));
+  assert.ok(calls.filter(c=>c.url.includes('api.netlify')).every(c=>c.headers.authorization==='Bearer dedicated-analytics-secret'));
+  assert.equal(env.NETLIFY_API_TOKEN,'server-only-secret');
 });
