@@ -25,7 +25,7 @@ export function analyticsPanel({ el, button, data, loading, error, range, change
   main.append(el('section', { class: 'analytics-window', 'aria-label': 'Selected Netlify time window' },
     el('div', {}, el('p', { class: 'eyebrow' }, 'NETLIFY'), el('h2', {}, analyticsRanges[data.range].label)),
     el('p', {}, time(data.from), ' – ', time(data.to))));
-  if (data.coverageLimited) main.append(el('p', { class: 'analytics-footnote' }, 'Netlify’s rolling seven-day retention excludes the first partial minute. The exact available window is shown above.'));
+  if (data.coverageLimited) main.append(el('p', { class: 'analytics-footnote' }, 'Netlify’s rolling retention limits the start of this report. The exact available window is shown above.'));
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const unit = Math.min(4, Math.floor(Math.log10(Math.max(1, data.bandwidthBytes)) / 3));
   const bandwidth = `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(data.bandwidthBytes / (1000 ** unit))} ${units[unit]}`;
